@@ -31,8 +31,9 @@ client.once('ready', async () => {
     process.exit(1);
   }
 
-  await registerCommands(client);
-  logger.info('Slash commands registered');
+  await registerCommands(client).catch((err) => {
+    logger.error('Failed to register slash commands:', err.message);
+  });
 
   try {
     await restoreTracker(client);

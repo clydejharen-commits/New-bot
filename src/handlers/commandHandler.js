@@ -1,4 +1,4 @@
-const { Collection } = require('discord.js');
+const { Collection, REST, Routes } = require('discord.js');
 const { commands } = require('../commands');
 const { handleTrackStart, handleTrackStop } = require('../commands/track');
 const {
@@ -48,9 +48,31 @@ function wrapInteractionCtx(interaction) {
   };
 }
 
-function registerCommands(client) {
+async function registerCommands(client) {
   client.commands = new Collection();
   client.commandData = commands;
+
+  const token = process.env.DISCORD_TOKEN;
+  const clientId = process.env.CLIENT_ID;
+  const guildId = process.env.GUILD_ID;
+
+  if (!token || !clientId) {
+    logger.error('Missing DISCORD_TOKEN or CLIENT_ID — slash commands will not be registered with Discord');
+    return;
+  }
+
+  if (!guildId) {
+    logger.warn('GUILD_ID is not set — commands will be registered globally instead of to a specific guild');
+  }
+
+  const rest = new REST({ version: '10' }).setToken(token);
+  const route = guildId
+    ? Routes.applicationGuildCommands(clientId, guildId)
+    : Routes.applicationCommands(clientId);
+
+  await rest.put(route, { body: commands });
+
+  logger.info(`Successfully registered ${commands.length} slash commands${guildId ? ` to guild ${guildId}` : ' globally'}.`);
 }
 
 async function handleInteraction(interaction) {
