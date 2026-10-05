@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "services": [
+    {
+      "type": "web",
+      "name": "new-bot",
+      "env": "node",
+      "startCommand": "npm start",
+      "envVars": [
+        { "key": "NODE_VERSION", "value": "18" }
+      ]
+    }
+  ]
+}
