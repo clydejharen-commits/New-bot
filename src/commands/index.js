@@ -22,6 +22,26 @@ const setupCommand = new SlashCommandBuilder()
   .setName('setup')
   .setDescription('Open the bot setup dashboard');
 
-const commands = [trackCommand.toJSON(), setupCommand.toJSON()];
+const quarantineCommand = new SlashCommandBuilder()
+  .setName('quarantine')
+  .setDescription('Quarantine a member by removing their roles and assigning the quarantine role')
+  .addUserOption((opt) =>
+    opt.setName('user').setDescription('The member to quarantine').setRequired(true),
+  )
+  .addStringOption((opt) =>
+    opt.setName('reason').setDescription('Reason for quarantining').setRequired(true),
+  );
+
+const unquarantineCommand = new SlashCommandBuilder()
+  .setName('unquarantine')
+  .setDescription('Remove a member from quarantine and restore their previous roles')
+  .addUserOption((opt) =>
+    opt.setName('user').setDescription('The member to unquarantine').setRequired(true),
+  )
+  .addStringOption((opt) =>
+    opt.setName('reason').setDescription('Reason for unquarantining').setRequired(true),
+  );
+
+const commands = [trackCommand.toJSON(), setupCommand.toJSON(), quarantineCommand.toJSON(), unquarantineCommand.toJSON()];
 
 module.exports = { commands };

@@ -4,6 +4,9 @@ const SetupSchema = new Schema({
   guildId: { type: String, required: true, unique: true, index: true },
   trackerChannelId: { type: String, default: null },
   trackerPingId: { type: String, default: null },
+  quarantineStaffRoleId: { type: String, default: null },
+  quarantineLogChannelId: { type: String, default: null },
+  quarantineRoleId: { type: String, default: null },
 });
 
 module.exports = model('Setup', SetupSchema);
