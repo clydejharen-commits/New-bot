@@ -5,6 +5,8 @@ const TrackerSchema = new Schema({
   robloxUsername: { type: String, required: true },
   robloxUserId: { type: String, required: true },
   milestone: { type: Number, required: true },
+  targetFollowers: { type: Number, default: 0 },
+  messageId: { type: String, default: null },
   channelId: { type: String, required: true },
   pingIds: { type: [String], default: [] },
   active: { type: Boolean, default: true },

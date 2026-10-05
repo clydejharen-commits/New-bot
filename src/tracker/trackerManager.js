@@ -2,6 +2,7 @@ const Tracker = require('../models/Tracker');
 const Setup = require('../models/Setup');
 const robloxApi = require('../utils/robloxApi');
 const logger = require('../utils/logger');
+const { EmbedBuilder } = require('discord.js');
 
 let interval = null;
 let clientRef = null;
@@ -52,6 +53,77 @@ function calculateRates(dataPoints, latestFollowers, startedFollowers, startedAt
   return { perMinute, perHour, perDay, elapsedMin };
 }
 
+function buildProgressEmbed(tracker, currentFollowers) {
+  const gained = Math.max(currentFollowers - tracker.startedFollowers, 0);
+  const target = tracker.targetFollowers;
+  const milestone = tracker.milestone;
+  const remaining = Math.max(target - currentFollowers, 0);
+  const pct = milestone > 0 ? Math.min((gained / milestone) * 100, 100) : 0;
+
+  const rates = calculateRates(tracker.dataPoints, currentFollowers, tracker.startedFollowers, tracker.startedAt);
+  const fmt = (n) => Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+  return new EmbedBuilder()
+    .setTitle('Roblox Follower Tracker')
+    .setColor(0x2b2d31)
+    .addFields(
+      { name: 'User', value: tracker.robloxUsername, inline: true },
+      { name: 'Roblox ID', value: tracker.robloxUserId, inline: true },
+      { name: 'Milestone', value: fmt(milestone), inline: true },
+      { name: 'Starting Followers', value: fmt(tracker.startedFollowers), inline: true },
+      { name: 'Current Followers', value: fmt(currentFollowers), inline: true },
+      { name: 'Target', value: fmt(target), inline: true },
+      { name: 'Followers Gained', value: `${fmt(gained)} / ${fmt(milestone)}`, inline: true },
+      { name: 'Remaining', value: fmt(remaining), inline: true },
+      { name: 'Progress', value: `${pct.toFixed(1)}%`, inline: true },
+      { name: 'Followers / min', value: fmt(rates.perMinute), inline: true },
+      { name: 'Followers / hour', value: fmt(rates.perHour), inline: true },
+      { name: 'Tracked for', value: `${rates.elapsedMin.toFixed(1)} min`, inline: true },
+    )
+    .setFooter({ text: 'Checking every 1 minute' })
+    .setTimestamp();
+}
+
+function buildCompletedEmbed(tracker, currentFollowers) {
+  const gained = Math.max(currentFollowers - tracker.startedFollowers, 0);
+  const target = tracker.targetFollowers;
+  const milestone = tracker.milestone;
+  const rates = calculateRates(tracker.dataPoints, currentFollowers, tracker.startedFollowers, tracker.startedAt);
+  const fmt = (n) => Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+  return new EmbedBuilder()
+    .setTitle('Roblox Follower Milestone Reached!')
+    .setColor(0x00b06b)
+    .addFields(
+      { name: 'User', value: tracker.robloxUsername, inline: true },
+      { name: 'Roblox ID', value: tracker.robloxUserId, inline: true },
+      { name: 'Milestone', value: fmt(milestone), inline: true },
+      { name: 'Starting Followers', value: fmt(tracker.startedFollowers), inline: true },
+      { name: 'Current Followers', value: fmt(currentFollowers), inline: true },
+      { name: 'Target', value: fmt(target), inline: true },
+      { name: 'Followers Gained', value: `${fmt(gained)} / ${fmt(milestone)}`, inline: true },
+      { name: 'Followers / min', value: fmt(rates.perMinute), inline: true },
+      { name: 'Tracked for', value: `${rates.elapsedMin.toFixed(1)} min`, inline: true },
+    )
+    .setFooter({ text: 'Tracker stopped automatically — milestone reached' })
+    .setTimestamp();
+}
+
+async function fetchTrackingMessage(tracker) {
+  if (!clientRef || !tracker.messageId || !tracker.channelId) return null;
+  try {
+    const guild = await clientRef.guilds.fetch(tracker.guildId);
+    if (!guild) return null;
+    const channel = guild.channels.cache.get(tracker.channelId) || await guild.channels.fetch(tracker.channelId).catch(() => null);
+    if (!channel) return null;
+    const message = await channel.messages.fetch(tracker.messageId).catch(() => null);
+    return message || null;
+  } catch (err) {
+    logger.error('Failed to fetch tracking message:', err.message);
+    return null;
+  }
+}
+
 async function checkOnce() {
   let tracker;
   try {
@@ -84,52 +156,46 @@ async function checkOnce() {
 
   await tracker.save();
 
-  if (!tracker.milestoneReached && count >= tracker.milestone) {
+  const target = tracker.targetFollowers;
+
+  if (!tracker.milestoneReached && count >= target) {
     tracker.milestoneReached = true;
     await tracker.save();
-    await sendMilestoneNotification(tracker, count);
-    stopInterval();
-    await Tracker.updateOne({ _id: tracker._id }, { active: false });
-  }
-}
 
-async function sendMilestoneNotification(tracker, count) {
-  try {
-    const guild = await clientRef.guilds.fetch(tracker.guildId);
-    if (!guild) return;
-
-    const channel = guild.channels.cache.get(tracker.channelId) || await guild.channels.fetch(tracker.channelId).catch(() => null);
-    if (!channel) {
-      logger.warn(`Milestone channel ${tracker.channelId} not found`);
-      return;
+    const embed = buildCompletedEmbed(tracker, count);
+    const message = await fetchTrackingMessage(tracker);
+    if (message) {
+      const pingContent = formatPingContent(tracker.pingIds);
+      await message.edit({ content: pingContent || undefined, embeds: [embed] }).catch((err) => {
+        logger.error('Failed to edit tracking message on completion:', err.message);
+      });
+    } else {
+      try {
+        const guild = await clientRef.guilds.fetch(tracker.guildId);
+        const channel = guild.channels.cache.get(tracker.channelId) || await guild.channels.fetch(tracker.channelId).catch(() => null);
+        if (channel) {
+          const pingContent = formatPingContent(tracker.pingIds);
+          await channel.send({ content: pingContent || undefined, embeds: [embed] });
+        }
+      } catch (err) {
+        logger.error('Failed to send completion notification:', err.message);
+      }
     }
 
-    const rates = calculateRates(tracker.dataPoints, count, tracker.startedFollowers, tracker.startedAt);
+    logger.info(`Milestone reached for ${tracker.robloxUsername} at ${count} followers (target: ${target})`);
+    stopInterval();
+    await Tracker.updateOne({ _id: tracker._id }, { active: false });
+    return;
+  }
 
-    const fmt = (n) => Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
-
-    const pingContent = formatPingContent(tracker.pingIds);
-
-    const { EmbedBuilder } = require('discord.js');
-    const embed = new EmbedBuilder()
-      .setTitle('Roblox Follower Milestone Reached!')
-      .setColor(0x00b06b)
-      .addFields(
-        { name: 'User', value: tracker.robloxUsername, inline: true },
-        { name: 'Current Followers', value: fmt(count), inline: true },
-        { name: 'Milestone', value: fmt(tracker.milestone), inline: true },
-        { name: 'Followers / min', value: fmt(rates.perMinute), inline: true },
-        { name: 'Followers / hour', value: fmt(rates.perHour), inline: true },
-        { name: 'Followers / day', value: fmt(rates.perDay), inline: true },
-        { name: 'Tracked for', value: `${rates.elapsedMin.toFixed(1)} min`, inline: true },
-      )
-      .setFooter({ text: 'Tracker stopped automatically' })
-      .setTimestamp();
-
-    await channel.send({ content: pingContent || undefined, embeds: [embed] });
-    logger.info(`Milestone reached for ${tracker.robloxUsername} at ${count} followers`);
-  } catch (err) {
-    logger.error('Failed to send milestone notification:', err.message);
+  const embed = buildProgressEmbed(tracker, count);
+  const message = await fetchTrackingMessage(tracker);
+  if (message) {
+    await message.edit({ embeds: [embed] }).catch((err) => {
+      logger.error('Failed to edit tracking message:', err.message);
+    });
+  } else {
+    logger.warn(`Tracking message ${tracker.messageId} not found — cannot update embed`);
   }
 }
 
@@ -161,12 +227,15 @@ async function startTracker({ guildId, robloxUsername, robloxUserId, milestone, 
 
   const count = await robloxApi.getFollowerCount(robloxUserId).catch(() => null);
   const startCount = typeof count === 'number' ? count : 0;
+  const targetFollowers = startCount + milestone;
 
   const tracker = await Tracker.create({
     guildId,
     robloxUsername,
     robloxUserId,
     milestone,
+    targetFollowers,
+    messageId: null,
     channelId,
     pingIds,
     active: true,
@@ -179,7 +248,11 @@ async function startTracker({ guildId, robloxUsername, robloxUserId, milestone, 
   });
 
   startInterval();
-  return { success: true, tracker, startCount };
+  return { success: true, trackerId: tracker._id, startCount, targetFollowers };
+}
+
+async function setMessageId(trackerId, messageId) {
+  await Tracker.updateOne({ _id: trackerId }, { messageId });
 }
 
 async function stopTracker() {
@@ -192,7 +265,7 @@ async function restoreTracker(client) {
   clientRef = client;
   const active = await Tracker.findOne({ active: true, milestoneReached: false });
   if (active) {
-    logger.info(`Restoring active tracker for ${active.robloxUsername}`);
+    logger.info(`Restoring active tracker for ${active.robloxUsername} (target: ${active.targetFollowers})`);
     startInterval();
   } else {
     await Tracker.updateMany({ active: true, milestoneReached: true }, { active: false });
@@ -210,4 +283,5 @@ module.exports = {
   restoreTracker,
   startInterval,
   stopInterval,
+  setMessageId,
 };

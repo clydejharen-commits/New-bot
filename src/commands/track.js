@@ -1,6 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
 const trackerManager = require('../tracker/trackerManager');
-const Setup = require('../models/Setup');
 const robloxApi = require('../utils/robloxApi');
 const logger = require('../utils/logger');
 
@@ -61,23 +60,31 @@ async function handleTrackStart(interaction) {
     return interaction.editReply(result.reason);
   }
 
+  const startCount = result.startCount || 0;
+  const target = result.targetFollowers || (startCount + milestone);
+
   const embed = new EmbedBuilder()
-    .setTitle('Roblox Tracker Started')
+    .setTitle('Roblox Follower Tracker')
     .setColor(0x2b2d31)
     .addFields(
       { name: 'User', value: userInfo.username, inline: true },
       { name: 'Roblox ID', value: userInfo.id, inline: true },
       { name: 'Milestone', value: milestone.toLocaleString(), inline: true },
-      { name: 'Starting Followers', value: (result.startCount || 0).toLocaleString(), inline: true },
-      { name: 'Channel', value: `<#${channelId}>`, inline: true },
-      { name: 'Interval', value: '60 seconds', inline: true },
+      { name: 'Starting Followers', value: startCount.toLocaleString(), inline: true },
+      { name: 'Current Followers', value: startCount.toLocaleString(), inline: true },
+      { name: 'Target', value: target.toLocaleString(), inline: true },
+      { name: 'Followers Gained', value: `0 / ${milestone.toLocaleString()}`, inline: true },
+      { name: 'Remaining', value: milestone.toLocaleString(), inline: true },
+      { name: 'Progress', value: '0.0%', inline: true },
     )
     .setFooter({ text: 'Checking every 1 minute' })
     .setTimestamp();
 
-  await interaction.channel.send({ embeds: [embed] });
+  const trackerMessage = await interaction.channel.send({ embeds: [embed] });
 
-  return interaction.editReply({ content: 'Tracker started — the tracking embed has been posted in this channel.' });
+  await trackerManager.setMessageId(result.trackerId, trackerMessage.id);
+
+  return interaction.editReply({ content: 'Tracker started — the tracking embed has been posted in this channel and will update every minute.' });
 }
 
 async function handleTrackStop(ctx) {
