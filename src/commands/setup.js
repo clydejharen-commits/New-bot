@@ -7,6 +7,7 @@ const {
   ChannelType,
   RoleSelectMenuBuilder,
   MentionableSelectMenuBuilder,
+  ChannelSelectMenuBuilder,
 } = require('discord.js');
 const Setup = require('../models/Setup');
 const logger = require('../utils/logger');
@@ -41,7 +42,7 @@ async function handleSetup(interaction) {
   const modRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('mod_settings')
-      .setLabel('Mod Settings')
+      .setLabel('🛡️ Mod Settings')
       .setStyle(ButtonStyle.Secondary),
   );
 
@@ -118,15 +119,12 @@ async function openModSettings(interaction) {
     .setCustomId('mod_quarantine_staff')
     .setPlaceholder('Select Quarantine Staff role');
 
-  const logMenu = new StringSelectMenuBuilder()
+  const logMenu = new ChannelSelectMenuBuilder()
     .setCustomId('mod_quarantine_logs')
-    .setPlaceholder('Select Quarantine Logs channel')
-    .addOptions(
-      interaction.guild.channels.cache
-        .filter((c) => c.type === ChannelType.GuildText)
-        .first(25)
-        .map((c) => ({ label: c.name, value: c.id })),
-    );
+    .setPlaceholder('Search and select Quarantine Logs channel')
+    .addChannelTypes(ChannelType.GuildText)
+    .setMinValues(1)
+    .setMaxValues(1);
 
   const quarantineRoleMenu = new RoleSelectMenuBuilder()
     .setCustomId('mod_quarantine_role')
@@ -196,7 +194,7 @@ async function handleBack(interaction) {
   const modRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('mod_settings')
-      .setLabel('Mod Settings')
+      .setLabel('🛡️ Mod Settings')
       .setStyle(ButtonStyle.Secondary),
   );
 

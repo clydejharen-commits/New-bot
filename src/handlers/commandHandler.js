@@ -102,6 +102,9 @@ async function handleInteraction(interaction) {
 
   if (interaction.isStringSelectMenu()) {
     if (interaction.customId === 'tracker_ping_menu') return handlePingMenu(interaction);
+  }
+
+  if (interaction.isChannelSelectMenu()) {
     if (interaction.customId === 'mod_quarantine_logs') return handleQuarantineLogsMenu(interaction);
   }
 
