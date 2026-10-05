@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const trackerManager = require('../tracker/trackerManager');
+const Setup = require('../models/Setup');
 const robloxApi = require('../utils/robloxApi');
 const logger = require('../utils/logger');
 
@@ -21,13 +22,8 @@ async function handleTrackStart(interaction) {
     return interaction.editReply('Milestone must be a positive number.');
   }
 
-  const setup = await trackerManager.getSetup(interaction.guildId);
-  if (!setup.trackerChannelId) {
-    return interaction.editReply('No tracking channel configured. Use `/setup` to configure Tracker Settings first.');
-  }
-
   if (trackerManager.isRunning()) {
-    return interaction.editReply('A tracker is already active. Stop it first with `w! Track stop` or `/track stop`.');
+    return interaction.editReply('A tracker is already active. Stop it first with `w! Track stop`.');
   }
 
   let userInfo;
@@ -41,6 +37,11 @@ async function handleTrackStart(interaction) {
     return interaction.editReply(`Could not find a Roblox user named "${username}".`);
   }
 
+  const setup = await trackerManager.getSetup(interaction.guildId);
+  const pingIds = (setup.trackerPingIds || []).slice();
+
+  const channelId = interaction.channelId;
+
   let result;
   try {
     result = await trackerManager.startTracker({
@@ -48,8 +49,8 @@ async function handleTrackStart(interaction) {
       robloxUsername: userInfo.username,
       robloxUserId: userInfo.id,
       milestone,
-      channelId: setup.trackerChannelId,
-      pingId: setup.trackerPingId,
+      channelId,
+      pingIds,
     });
   } catch (err) {
     logger.error('startTracker error:', err.message);
@@ -68,13 +69,15 @@ async function handleTrackStart(interaction) {
       { name: 'Roblox ID', value: userInfo.id, inline: true },
       { name: 'Milestone', value: milestone.toLocaleString(), inline: true },
       { name: 'Starting Followers', value: (result.startCount || 0).toLocaleString(), inline: true },
-      { name: 'Channel', value: `<#${setup.trackerChannelId}>`, inline: true },
+      { name: 'Channel', value: `<#${channelId}>`, inline: true },
       { name: 'Interval', value: '60 seconds', inline: true },
     )
     .setFooter({ text: 'Checking every 1 minute' })
     .setTimestamp();
 
-  return interaction.editReply({ embeds: [embed] });
+  await interaction.channel.send({ embeds: [embed] });
+
+  return interaction.editReply({ content: 'Tracker started — the tracking embed has been posted in this channel.' });
 }
 
 async function handleTrackStop(ctx) {

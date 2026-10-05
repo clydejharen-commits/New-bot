@@ -1,11 +1,10 @@
 const { Collection, REST, Routes } = require('discord.js');
 const { commands } = require('../commands');
-const { handleTrackStart, handleTrackStop } = require('../commands/track');
+const { handleTrackStart } = require('../commands/track');
 const {
   handleSetup,
   openTrackerSettings,
   openModSettings,
-  handleChannelMenu,
   handlePingMenu,
   handleQuarantineStaffMenu,
   handleQuarantineLogsMenu,
@@ -82,7 +81,6 @@ async function handleInteraction(interaction) {
     if (commandName === 'track') {
       const sub = interaction.options.getSubcommand();
       if (sub === 'start') return handleTrackStart(interaction);
-      if (sub === 'stop') return handleTrackStop(interaction);
     }
 
     if (commandName === 'setup') return handleSetup(interaction);
@@ -103,16 +101,17 @@ async function handleInteraction(interaction) {
   }
 
   if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === 'tracker_channel_menu') return handleChannelMenu(interaction);
     if (interaction.customId === 'tracker_ping_menu') return handlePingMenu(interaction);
-    if (interaction.customId === 'mod_quarantine_staff') return handleQuarantineStaffMenu(interaction);
     if (interaction.customId === 'mod_quarantine_logs') return handleQuarantineLogsMenu(interaction);
-    if (interaction.customId === 'mod_quarantine_role') return handleQuarantineRoleMenu(interaction);
   }
 
   if (interaction.isRoleSelectMenu()) {
     if (interaction.customId === 'mod_quarantine_staff') return handleQuarantineStaffMenu(interaction);
     if (interaction.customId === 'mod_quarantine_role') return handleQuarantineRoleMenu(interaction);
+  }
+
+  if (interaction.isMentionableSelectMenu()) {
+    if (interaction.customId === 'tracker_ping_menu') return handlePingMenu(interaction);
   }
 }
 

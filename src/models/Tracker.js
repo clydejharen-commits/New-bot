@@ -6,7 +6,7 @@ const TrackerSchema = new Schema({
   robloxUserId: { type: String, required: true },
   milestone: { type: Number, required: true },
   channelId: { type: String, required: true },
-  pingId: { type: String, default: null },
+  pingIds: { type: [String], default: [] },
   active: { type: Boolean, default: true },
   milestoneReached: { type: Boolean, default: false },
   startedAt: { type: Date, default: Date.now },

@@ -6,6 +6,14 @@ const logger = require('../utils/logger');
 let interval = null;
 let clientRef = null;
 
+function formatPingContent(pingIds) {
+  if (!pingIds || pingIds.length === 0) return '';
+  return pingIds.map((id) => {
+    if (id.startsWith('role:')) return `<@&${id.slice(5)}>`;
+    return `<@${id}>`;
+  }).join(' ');
+}
+
 function setClient(client) {
   clientRef = client;
 }
@@ -100,11 +108,7 @@ async function sendMilestoneNotification(tracker, count) {
 
     const fmt = (n) => Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
-    const pingContent = tracker.pingId
-      ? tracker.pingId.startsWith('role:')
-        ? `<@&${tracker.pingId.slice(4)}>`
-        : `<@${tracker.pingId}>`
-      : '';
+    const pingContent = formatPingContent(tracker.pingIds);
 
     const { EmbedBuilder } = require('discord.js');
     const embed = new EmbedBuilder()
@@ -149,10 +153,10 @@ function stopInterval() {
   }
 }
 
-async function startTracker({ guildId, robloxUsername, robloxUserId, milestone, channelId, pingId }) {
+async function startTracker({ guildId, robloxUsername, robloxUserId, milestone, channelId, pingIds }) {
   const existing = await Tracker.findOne({ active: true });
   if (existing) {
-    return { success: false, reason: 'A tracker is already active. Stop it first with `w! Track stop` or `/track stop`.' };
+    return { success: false, reason: 'A tracker is already active. Stop it first with `w! Track stop`.' };
   }
 
   const count = await robloxApi.getFollowerCount(robloxUserId).catch(() => null);
@@ -164,7 +168,7 @@ async function startTracker({ guildId, robloxUsername, robloxUserId, milestone, 
     robloxUserId,
     milestone,
     channelId,
-    pingId,
+    pingIds,
     active: true,
     milestoneReached: false,
     startedAt: new Date(),

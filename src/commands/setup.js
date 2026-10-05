@@ -6,8 +6,8 @@ const {
   StringSelectMenuBuilder,
   ChannelType,
   RoleSelectMenuBuilder,
+  MentionableSelectMenuBuilder,
 } = require('discord.js');
-const trackerManager = require('../tracker/trackerManager');
 const Setup = require('../models/Setup');
 const logger = require('../utils/logger');
 
@@ -26,8 +26,6 @@ async function handleSetup(interaction) {
 
   await interaction.deferReply({ ephemeral: true });
 
-  const setup = await getSetup(interaction.guildId);
-
   const embed = new EmbedBuilder()
     .setTitle('Bot Setup Dashboard')
     .setColor(0x2b2d31)
@@ -36,7 +34,7 @@ async function handleSetup(interaction) {
   const trackerRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('tracker_settings')
-      .setLabel('Tracker Settings')
+      .setLabel('⚙️ Tracker Settings')
       .setStyle(ButtonStyle.Primary),
   );
 
@@ -53,56 +51,42 @@ async function handleSetup(interaction) {
 async function openTrackerSettings(interaction) {
   const setup = await getSetup(interaction.guildId);
 
+  const pingDisplay = setup.trackerPingIds && setup.trackerPingIds.length > 0
+    ? setup.trackerPingIds.map((id) => {
+        if (id.startsWith('role:')) return `<@&${id.slice(5)}>`;
+        return `<@${id}>`;
+      }).join(' ')
+    : 'Not set';
+
   const embed = new EmbedBuilder()
-    .setTitle('Tracker Settings')
+    .setTitle('⚙️ Tracker Settings')
     .setColor(0x2b2d31)
-    .setDescription('Choose the channel where the tracking embed is posted and the role/user to ping when the milestone is reached.')
+    .setDescription(
+      'Select the users and/or roles to ping when the milestone is reached.\n' +
+      'You can search and select multiple users and roles.\n\n' +
+      '⚠️ Disclaimer: The tracking embed is only sent to the channel where the command is executed, so it will not always send to the same channel.',
+    )
     .addFields(
       {
-        name: 'Current Channel',
-        value: setup.trackerChannelId ? `<#${setup.trackerChannelId}>` : 'Not set',
-        inline: true,
-      },
-      {
-        name: 'Current Ping',
-        value: setup.trackerPingId
-          ? setup.trackerPingId.startsWith('role:')
-            ? `<@&${setup.trackerPingId.slice(4)}>`
-            : `<@${setup.trackerPingId}>`
-          : 'Not set',
-        inline: true,
+        name: 'Current Ping Targets',
+        value: pingDisplay,
+        inline: false,
       },
     );
 
-  const channelMenu = new StringSelectMenuBuilder()
-    .setCustomId('tracker_channel_menu')
-    .setPlaceholder('Select tracking channel')
-    .addOptions(
-      interaction.guild.channels.cache
-        .filter((c) => c.type === ChannelType.GuildText)
-        .first(25)
-        .map((c) => ({ label: c.name, value: c.id })),
-    );
-
-  const roleMenu = new StringSelectMenuBuilder()
+  const pingMenu = new MentionableSelectMenuBuilder()
     .setCustomId('tracker_ping_menu')
-    .setPlaceholder('Select role or user to ping')
-    .addOptions(
-      { label: 'None', value: 'none' },
-      ...interaction.guild.roles.cache
-        .filter((r) => r.id !== interaction.guild.id)
-        .first(24)
-        .map((r) => ({ label: `Role: ${r.name}`, value: `role:${r.id}` })),
-    );
+    .setPlaceholder('Select users and/or roles to ping on milestone')
+    .setMinValues(0)
+    .setMaxValues(25);
 
-  const row1 = new ActionRowBuilder().addComponents(channelMenu);
-  const row2 = new ActionRowBuilder().addComponents(roleMenu);
+  const row1 = new ActionRowBuilder().addComponents(pingMenu);
 
   const backButton = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
   );
 
-  return interaction.update({ embeds: [embed], components: [row1, row2, backButton] });
+  return interaction.update({ embeds: [embed], components: [row1, backButton] });
 }
 
 async function openModSettings(interaction) {
@@ -158,24 +142,24 @@ async function openModSettings(interaction) {
   return interaction.update({ embeds: [embed], components: [row1, row2, row3, row4] });
 }
 
-async function handleChannelMenu(interaction) {
-  const channelId = interaction.values[0];
-  await Setup.updateOne({ guildId: interaction.guildId }, { trackerChannelId: channelId }, { upsert: true });
-  return interaction.reply({ content: `Tracking channel set to <#${channelId}>.`, ephemeral: true });
-}
-
 async function handlePingMenu(interaction) {
-  const value = interaction.values[0];
-  const pingId = value === 'none' ? null : value;
-  await Setup.updateOne({ guildId: interaction.guildId }, { trackerPingId: pingId }, { upsert: true });
+  const values = interaction.values || [];
 
-  const display = pingId
-    ? pingId.startsWith('role:')
-      ? `<@&${pingId.slice(4)}>`
-      : `<@${pingId}>`
+  const pingIds = values.map((v) => {
+    if (v.startsWith('role:')) return v;
+    return v;
+  });
+
+  await Setup.updateOne({ guildId: interaction.guildId }, { trackerPingIds: pingIds }, { upsert: true });
+
+  const display = pingIds.length > 0
+    ? pingIds.map((id) => {
+        if (id.startsWith('role:')) return `<@&${id.slice(5)}>`;
+        return `<@${id}>`;
+      }).join(' ')
     : 'None';
 
-  return interaction.reply({ content: `Milestone ping set to ${display}.`, ephemeral: true });
+  return interaction.reply({ content: `Milestone ping targets updated: ${display}`, ephemeral: true });
 }
 
 async function handleQuarantineStaffMenu(interaction) {
@@ -205,7 +189,7 @@ async function handleBack(interaction) {
   const trackerRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('tracker_settings')
-      .setLabel('Tracker Settings')
+      .setLabel('⚙️ Tracker Settings')
       .setStyle(ButtonStyle.Primary),
   );
 
@@ -223,7 +207,6 @@ module.exports = {
   handleSetup,
   openTrackerSettings,
   openModSettings,
-  handleChannelMenu,
   handlePingMenu,
   handleQuarantineStaffMenu,
   handleQuarantineLogsMenu,

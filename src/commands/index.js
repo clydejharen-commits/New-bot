@@ -14,9 +14,7 @@ const trackCommand = new SlashCommandBuilder()
         opt.setName('milestone').setDescription('Follower milestone to notify at').setRequired(true).setMinValue(1),
       ),
   )
-  .addSubcommand((sub) =>
-    sub.setName('stop').setDescription('Stop the active tracker'),
-  );
+;
 
 const setupCommand = new SlashCommandBuilder()
   .setName('setup')
