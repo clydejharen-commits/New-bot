@@ -1,14 +1,18 @@
 const { Collection, REST, Routes } = require('discord.js');
 const { commands } = require('../commands');
 const { handleTrackStart } = require('../commands/track');
+const { handleTag } = require('../commands/tag');
 const {
   handleSetup,
   openTrackerSettings,
   openModSettings,
+  openTagSettings,
   handlePingMenu,
   handleQuarantineStaffMenu,
   handleQuarantineLogsMenu,
   handleQuarantineRoleMenu,
+  handleTagRoleMenu,
+  handleTagRoleDisable,
   handleBack,
 } = require('../commands/setup');
 const { handleQuarantine, handleUnquarantine } = require('../commands/quarantine');
@@ -92,11 +96,15 @@ async function handleInteraction(interaction) {
     if (commandName === 'unquarantine') {
       return handleUnquarantine(wrapInteractionCtx(interaction));
     }
+
+    if (commandName === 'tag') return handleTag(interaction);
   }
 
   if (interaction.isButton()) {
     if (interaction.customId === 'tracker_settings') return openTrackerSettings(interaction);
     if (interaction.customId === 'mod_settings') return openModSettings(interaction);
+    if (interaction.customId === 'tag_settings') return openTagSettings(interaction);
+    if (interaction.customId === 'tag_role_disable') return handleTagRoleDisable(interaction);
     if (interaction.customId === 'setup_back') return handleBack(interaction);
   }
 
@@ -111,6 +119,7 @@ async function handleInteraction(interaction) {
   if (interaction.isRoleSelectMenu()) {
     if (interaction.customId === 'mod_quarantine_staff') return handleQuarantineStaffMenu(interaction);
     if (interaction.customId === 'mod_quarantine_role') return handleQuarantineRoleMenu(interaction);
+    if (interaction.customId === 'tag_role_menu') return handleTagRoleMenu(interaction);
   }
 
   if (interaction.isMentionableSelectMenu()) {

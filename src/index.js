@@ -6,6 +6,7 @@ const logger = require('./utils/logger');
 const { registerCommands, handleInteraction } = require('./handlers/commandHandler');
 const { handleMessage } = require('./handlers/messageHandler');
 const { restoreTracker, setClient } = require('./tracker/trackerManager');
+const { checkAllMembers, handleUserUpdate, handleGuildMemberAdd } = require('./handlers/tagManager');
 
 const client = new Client({
   intents: [
@@ -41,6 +42,13 @@ client.once('ready', async () => {
   } catch (err) {
     logger.error('Failed to restore tracker:', err.message);
   }
+
+  try {
+    await checkAllMembers(client);
+    logger.info('Auto Tag Role member check complete');
+  } catch (err) {
+    logger.error('Failed to check members for tag roles:', err.message);
+  }
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -56,6 +64,22 @@ client.on('messageCreate', async (message) => {
     await handleMessage(message);
   } catch (err) {
     logger.error('Message error:', err.message);
+  }
+});
+
+client.on('userUpdate', async (oldUser, newUser) => {
+  try {
+    await handleUserUpdate(client, oldUser, newUser);
+  } catch (err) {
+    logger.error('User update error:', err.message);
+  }
+});
+
+client.on('guildMemberAdd', async (member) => {
+  try {
+    await handleGuildMemberAdd(member);
+  } catch (err) {
+    logger.error('Guild member add error:', err.message);
   }
 });
 

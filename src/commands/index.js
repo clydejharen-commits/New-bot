@@ -40,6 +40,15 @@ const unquarantineCommand = new SlashCommandBuilder()
     opt.setName('reason').setDescription('Reason for unquarantining').setRequired(true),
   );
 
-const commands = [trackCommand.toJSON(), setupCommand.toJSON(), quarantineCommand.toJSON(), unquarantineCommand.toJSON()];
+const tagCommand = new SlashCommandBuilder()
+  .setName('tag')
+  .setDescription('Server Tag verification')
+  .addSubcommand((sub) =>
+    sub
+      .setName('verify')
+      .setDescription('Check if you are wearing this server\'s Server Tag'),
+  );
+
+const commands = [trackCommand.toJSON(), setupCommand.toJSON(), quarantineCommand.toJSON(), unquarantineCommand.toJSON(), tagCommand.toJSON()];
 
 module.exports = { commands };

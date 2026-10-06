@@ -46,7 +46,14 @@ async function handleSetup(interaction) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  return interaction.editReply({ embeds: [embed], components: [trackerRow, modRow] });
+  const tagRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('tag_settings')
+      .setLabel('🏷️ Auto Tag Role')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.editReply({ embeds: [embed], components: [trackerRow, modRow, tagRow] });
 }
 
 async function openTrackerSettings(interaction) {
@@ -178,6 +185,57 @@ async function handleQuarantineRoleMenu(interaction) {
   return interaction.reply({ content: `Quarantine Role set to <@&${roleId}>.`, ephemeral: true });
 }
 
+async function openTagSettings(interaction) {
+  const setup = await getSetup(interaction.guildId);
+
+  const status = setup.tagRoleEnabled && setup.tagRoleId
+    ? `Enabled — Role: <@&${setup.tagRoleId}>`
+    : 'Disabled';
+
+  const embed = new EmbedBuilder()
+    .setTitle('🏷️ Auto Tag Role')
+    .setColor(0x2b2d31)
+    .setDescription(
+      'Configure the role that is automatically given to members wearing this server\'s Server Tag.\n\n' +
+      'When a member equips this server\'s tag, they receive the role. When they remove it or switch to another server\'s tag, the role is removed.',
+    )
+    .addFields(
+      {
+        name: 'Status',
+        value: status,
+        inline: false,
+      },
+    );
+
+  const roleMenu = new RoleSelectMenuBuilder()
+    .setCustomId('tag_role_menu')
+    .setPlaceholder('Select the Server Tag Role');
+
+  const disableButton = new ButtonBuilder()
+    .setCustomId('tag_role_disable')
+    .setLabel('Disable Auto Tag Role')
+    .setStyle(ButtonStyle.Danger);
+
+  const row1 = new ActionRowBuilder().addComponents(roleMenu);
+  const row2 = new ActionRowBuilder().addComponents(
+    disableButton,
+    new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.update({ embeds: [embed], components: [row1, row2] });
+}
+
+async function handleTagRoleMenu(interaction) {
+  const roleId = interaction.values[0];
+  await Setup.updateOne({ guildId: interaction.guildId }, { tagRoleId: roleId, tagRoleEnabled: true }, { upsert: true });
+  return interaction.reply({ content: `Auto Tag Role set to <@&${roleId}>. Members wearing this server's tag will receive the role automatically.`, ephemeral: true });
+}
+
+async function handleTagRoleDisable(interaction) {
+  await Setup.updateOne({ guildId: interaction.guildId }, { tagRoleEnabled: false, tagRoleId: null }, { upsert: true });
+  return interaction.reply({ content: 'Auto Tag Role has been disabled.', ephemeral: true });
+}
+
 async function handleBack(interaction) {
   const embed = new EmbedBuilder()
     .setTitle('Bot Setup Dashboard')
@@ -198,16 +256,26 @@ async function handleBack(interaction) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  return interaction.update({ embeds: [embed], components: [trackerRow, modRow] });
+  const tagRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('tag_settings')
+      .setLabel('🏷️ Auto Tag Role')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.update({ embeds: [embed], components: [trackerRow, modRow, tagRow] });
 }
 
 module.exports = {
   handleSetup,
   openTrackerSettings,
   openModSettings,
+  openTagSettings,
   handlePingMenu,
   handleQuarantineStaffMenu,
   handleQuarantineLogsMenu,
   handleQuarantineRoleMenu,
+  handleTagRoleMenu,
+  handleTagRoleDisable,
   handleBack,
 };
