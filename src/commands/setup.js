@@ -192,6 +192,8 @@ async function openTagSettings(interaction) {
     ? `Enabled — Role: <@&${setup.tagRoleId}>`
     : 'Disabled';
 
+  const logDisplay = setup.tagLogChannelId ? `<#${setup.tagLogChannelId}>` : 'Not set';
+
   const embed = new EmbedBuilder()
     .setTitle('🏷️ Auto Tag Role')
     .setColor(0x2b2d31)
@@ -205,11 +207,23 @@ async function openTagSettings(interaction) {
         value: status,
         inline: false,
       },
+      {
+        name: 'Server Tag Logs',
+        value: logDisplay,
+        inline: false,
+      },
     );
 
   const roleMenu = new RoleSelectMenuBuilder()
     .setCustomId('tag_role_menu')
     .setPlaceholder('Select the Server Tag Role');
+
+  const logMenu = new ChannelSelectMenuBuilder()
+    .setCustomId('tag_log_menu')
+    .setPlaceholder('Search and select Server Tag Logs channel')
+    .addChannelTypes(ChannelType.GuildText)
+    .setMinValues(0)
+    .setMaxValues(1);
 
   const disableButton = new ButtonBuilder()
     .setCustomId('tag_role_disable')
@@ -217,12 +231,13 @@ async function openTagSettings(interaction) {
     .setStyle(ButtonStyle.Danger);
 
   const row1 = new ActionRowBuilder().addComponents(roleMenu);
-  const row2 = new ActionRowBuilder().addComponents(
+  const row2 = new ActionRowBuilder().addComponents(logMenu);
+  const row3 = new ActionRowBuilder().addComponents(
     disableButton,
     new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
   );
 
-  return interaction.update({ embeds: [embed], components: [row1, row2] });
+  return interaction.update({ embeds: [embed], components: [row1, row2, row3] });
 }
 
 async function handleTagRoleMenu(interaction) {
@@ -234,6 +249,16 @@ async function handleTagRoleMenu(interaction) {
 async function handleTagRoleDisable(interaction) {
   await Setup.updateOne({ guildId: interaction.guildId }, { tagRoleEnabled: false, tagRoleId: null }, { upsert: true });
   return interaction.reply({ content: 'Auto Tag Role has been disabled.', ephemeral: true });
+}
+
+async function handleTagLogMenu(interaction) {
+  const values = interaction.values || [];
+  const channelId = values.length > 0 ? values[0] : null;
+  await Setup.updateOne({ guildId: interaction.guildId }, { tagLogChannelId: channelId }, { upsert: true });
+  if (channelId) {
+    return interaction.reply({ content: `Server Tag Logs channel set to <#${channelId}>.`, ephemeral: true });
+  }
+  return interaction.reply({ content: 'Server Tag Logs channel has been removed.', ephemeral: true });
 }
 
 async function handleBack(interaction) {
@@ -277,5 +302,6 @@ module.exports = {
   handleQuarantineRoleMenu,
   handleTagRoleMenu,
   handleTagRoleDisable,
+  handleTagLogMenu,
   handleBack,
 };

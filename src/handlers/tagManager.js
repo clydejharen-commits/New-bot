@@ -1,5 +1,6 @@
 const Setup = require('../models/Setup');
 const logger = require('../utils/logger');
+const { EmbedBuilder } = require('discord.js');
 
 const BATCH_DELAY = 1000;
 
@@ -12,7 +13,26 @@ function hasServerTag(user, guildId) {
 async function getTagConfig(guildId) {
   const setup = await Setup.findOne({ guildId });
   if (!setup || !setup.tagRoleEnabled || !setup.tagRoleId) return null;
-  return { roleId: setup.tagRoleId, enabled: setup.tagRoleEnabled };
+  return { roleId: setup.tagRoleId, enabled: setup.tagRoleEnabled, logChannelId: setup.tagLogChannelId };
+}
+
+async function sendTagLog(guild, config, fields, color) {
+  if (!config || !config.logChannelId) return;
+  try {
+    const channel = guild.channels.cache.get(config.logChannelId) || await guild.channels.fetch(config.logChannelId).catch(() => null);
+    if (!channel) {
+      logger.warn(`Tag log channel ${config.logChannelId} not found in guild ${guild.id}`);
+      return;
+    }
+    const embed = new EmbedBuilder()
+      .setTitle('Server Tag Log')
+      .setColor(color)
+      .addFields(fields)
+      .setTimestamp();
+    await channel.send({ embeds: [embed] });
+  } catch (err) {
+    logger.error(`Failed to send tag log: ${err.message}`);
+  }
 }
 
 async function syncMemberTag(member) {
@@ -38,10 +58,24 @@ async function syncMemberTag(member) {
       await member.roles.add(config.roleId).catch((err) => {
         logger.error(`Failed to add tag role to ${member.user.tag}: ${err.message}`);
       });
+      await sendTagLog(member.guild, config, [
+        { name: 'User', value: `<@${member.user.id}>`, inline: true },
+        { name: 'Username', value: member.user.tag, inline: true },
+        { name: 'User ID', value: member.user.id, inline: true },
+        { name: 'Action', value: 'Server Tag Added', inline: true },
+        { name: 'Role Given', value: `<@&${config.roleId}>`, inline: true },
+      ], 0x00b06b);
     } else if (!wearing && hasRole) {
       await member.roles.remove(config.roleId).catch((err) => {
         logger.error(`Failed to remove tag role from ${member.user.tag}: ${err.message}`);
       });
+      await sendTagLog(member.guild, config, [
+        { name: 'User', value: `<@${member.user.id}>`, inline: true },
+        { name: 'Username', value: member.user.tag, inline: true },
+        { name: 'User ID', value: member.user.id, inline: true },
+        { name: 'Action', value: 'Server Tag Removed', inline: true },
+        { name: 'Role Removed', value: `<@&${config.roleId}>`, inline: true },
+      ], 0xed4245);
     }
   } catch (err) {
     logger.error(`syncMemberTag error for ${member.id}: ${err.message}`);
@@ -123,15 +157,27 @@ async function handleVerify(interaction) {
     return interaction.reply({ content: '⚠️ The configured Server Tag role no longer exists.', ephemeral: true });
   }
 
+  let roleAction = 'No change';
+
   if (wearing && !hasRole) {
     await member.roles.add(config.roleId).catch((err) => {
       logger.error(`Verify: failed to add tag role to ${member.user.tag}: ${err.message}`);
     });
+    roleAction = 'Role added';
   } else if (!wearing && hasRole) {
     await member.roles.remove(config.roleId).catch((err) => {
       logger.error(`Verify: failed to remove tag role from ${member.user.tag}: ${err.message}`);
     });
+    roleAction = 'Role removed';
   }
+
+  await sendTagLog(interaction.guild, config, [
+    { name: 'User', value: `<@${member.user.id}>`, inline: true },
+    { name: 'Username', value: member.user.tag, inline: true },
+    { name: 'User ID', value: member.user.id, inline: true },
+    { name: 'Server Tag Detected', value: wearing ? 'Yes' : 'No', inline: true },
+    { name: 'Role Action', value: roleAction, inline: true },
+  ], 0x2b2d31);
 
   if (wearing) {
     return interaction.reply({ content: '✅ You are wearing our Server Tag. Your role has been assigned.', ephemeral: true });

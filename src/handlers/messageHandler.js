@@ -2,6 +2,7 @@ const { PREFIX: rawPrefix } = process.env;
 const PREFIX = (rawPrefix || 'w!').trim();
 const { handleTrackStop } = require('../commands/track');
 const { handleQuarantine, handleUnquarantine } = require('../commands/quarantine');
+const { handleSend } = require('../commands/send');
 
 async function handleMessage(message) {
   if (message.author.bot || !message.guild) return;
@@ -29,6 +30,10 @@ async function handleMessage(message) {
   if (command === 'unquarantine') {
     const ctx = buildPrefixCtx(message, parts.slice(1));
     return handleUnquarantine(ctx);
+  }
+
+  if (command === 'send') {
+    return handleSend(message, parts.slice(1));
   }
 }
 

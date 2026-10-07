@@ -8,6 +8,7 @@ const SetupSchema = new Schema({
   quarantineRoleId: { type: String, default: null },
   tagRoleId: { type: String, default: null },
   tagRoleEnabled: { type: Boolean, default: false },
+  tagLogChannelId: { type: String, default: null },
 });
 
 module.exports = model('Setup', SetupSchema);

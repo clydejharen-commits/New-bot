@@ -13,6 +13,7 @@ const {
   handleQuarantineRoleMenu,
   handleTagRoleMenu,
   handleTagRoleDisable,
+  handleTagLogMenu,
   handleBack,
 } = require('../commands/setup');
 const { handleQuarantine, handleUnquarantine } = require('../commands/quarantine');
@@ -114,6 +115,7 @@ async function handleInteraction(interaction) {
 
   if (interaction.isChannelSelectMenu()) {
     if (interaction.customId === 'mod_quarantine_logs') return handleQuarantineLogsMenu(interaction);
+    if (interaction.customId === 'tag_log_menu') return handleTagLogMenu(interaction);
   }
 
   if (interaction.isRoleSelectMenu()) {
