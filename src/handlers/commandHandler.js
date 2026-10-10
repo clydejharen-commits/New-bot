@@ -19,8 +19,7 @@ const {
   handleTagLogMenu,
   handleAirdropAllowedUsers,
   handleAirdropAllowedRoles,
-  handleAirdropStaffUsers,
-  handleAirdropStaffRoles,
+  handleAirdropStaff,
   handleAirdropCategory,
   handleBack,
 } = require('../commands/setup');
@@ -143,16 +142,15 @@ async function handleInteraction(interaction) {
     if (interaction.customId === 'mod_quarantine_role') return handleQuarantineRoleMenu(interaction);
     if (interaction.customId === 'tag_role_menu') return handleTagRoleMenu(interaction);
     if (interaction.customId === 'airdrop_allowed_roles') return handleAirdropAllowedRoles(interaction);
-    if (interaction.customId === 'airdrop_staff_roles') return handleAirdropStaffRoles(interaction);
   }
 
   if (interaction.isMentionableSelectMenu()) {
     if (interaction.customId === 'tracker_ping_menu') return handlePingMenu(interaction);
+    if (interaction.customId === 'airdrop_staff') return handleAirdropStaff(interaction);
   }
 
   if (interaction.isUserSelectMenu()) {
     if (interaction.customId === 'airdrop_allowed_users') return handleAirdropAllowedUsers(interaction);
-    if (interaction.customId === 'airdrop_staff_users') return handleAirdropStaffUsers(interaction);
   }
 }
 
