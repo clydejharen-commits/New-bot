@@ -9,11 +9,6 @@ const SetupSchema = new Schema({
   tagRoleId: { type: String, default: null },
   tagRoleEnabled: { type: Boolean, default: false },
   tagLogChannelId: { type: String, default: null },
-  airdropAllowedUsers: { type: [String], default: [] },
-  airdropAllowedRoles: { type: [String], default: [] },
-  airdropTicketStaffUsers: { type: [String], default: [] },
-  airdropTicketStaffRoles: { type: [String], default: [] },
-  airdropTicketCategoryId: { type: String, default: null },
 });
 
 module.exports = model('Setup', SetupSchema);

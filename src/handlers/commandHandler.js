@@ -2,14 +2,11 @@ const { Collection, REST, Routes } = require('discord.js');
 const { commands } = require('../commands');
 const { handleTrackStart } = require('../commands/track');
 const { handleTag } = require('../commands/tag');
-const { handleAirdrop } = require('../commands/airdrop');
-const airdropManager = require('../handlers/airdropManager');
 const {
   handleSetup,
   openTrackerSettings,
   openModSettings,
   openTagSettings,
-  openAirdropSettings,
   handlePingMenu,
   handleQuarantineStaffMenu,
   handleQuarantineLogsMenu,
@@ -17,10 +14,6 @@ const {
   handleTagRoleMenu,
   handleTagRoleDisable,
   handleTagLogMenu,
-  handleAirdropAllowedUsers,
-  handleAirdropAllowedRoles,
-  handleAirdropStaff,
-  handleAirdropCategory,
   handleBack,
 } = require('../commands/setup');
 const { handleQuarantine, handleUnquarantine } = require('../commands/quarantine');
@@ -106,25 +99,14 @@ async function handleInteraction(interaction) {
     }
 
     if (commandName === 'tag') return handleTag(interaction);
-
-    if (commandName === 'airdrop') return handleAirdrop(interaction);
   }
 
   if (interaction.isButton()) {
     if (interaction.customId === 'tracker_settings') return openTrackerSettings(interaction);
     if (interaction.customId === 'mod_settings') return openModSettings(interaction);
     if (interaction.customId === 'tag_settings') return openTagSettings(interaction);
-    if (interaction.customId === 'airdrop_settings') return openAirdropSettings(interaction);
     if (interaction.customId === 'tag_role_disable') return handleTagRoleDisable(interaction);
     if (interaction.customId === 'setup_back') return handleBack(interaction);
-
-    if (interaction.customId === 'airdrop_claim_active') return airdropManager.handleClaim(interaction);
-    if (interaction.customId === 'airdrop_claim_inactive') {
-      return interaction.reply({ content: 'This airdrop is no longer available.', ephemeral: true });
-    }
-    if (interaction.customId === 'airdrop_ticket_close') return airdropManager.handleTicketClose(interaction);
-    if (interaction.customId === 'airdrop_ticket_close_confirm') return airdropManager.handleTicketCloseConfirm(interaction);
-    if (interaction.customId === 'airdrop_ticket_cancel') return airdropManager.handleTicketCancel(interaction);
   }
 
   if (interaction.isStringSelectMenu()) {
@@ -134,23 +116,16 @@ async function handleInteraction(interaction) {
   if (interaction.isChannelSelectMenu()) {
     if (interaction.customId === 'mod_quarantine_logs') return handleQuarantineLogsMenu(interaction);
     if (interaction.customId === 'tag_log_menu') return handleTagLogMenu(interaction);
-    if (interaction.customId === 'airdrop_category') return handleAirdropCategory(interaction);
   }
 
   if (interaction.isRoleSelectMenu()) {
     if (interaction.customId === 'mod_quarantine_staff') return handleQuarantineStaffMenu(interaction);
     if (interaction.customId === 'mod_quarantine_role') return handleQuarantineRoleMenu(interaction);
     if (interaction.customId === 'tag_role_menu') return handleTagRoleMenu(interaction);
-    if (interaction.customId === 'airdrop_allowed_roles') return handleAirdropAllowedRoles(interaction);
   }
 
   if (interaction.isMentionableSelectMenu()) {
     if (interaction.customId === 'tracker_ping_menu') return handlePingMenu(interaction);
-    if (interaction.customId === 'airdrop_staff') return handleAirdropStaff(interaction);
-  }
-
-  if (interaction.isUserSelectMenu()) {
-    if (interaction.customId === 'airdrop_allowed_users') return handleAirdropAllowedUsers(interaction);
   }
 }
 

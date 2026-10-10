@@ -6,12 +6,10 @@ const {
   StringSelectMenuBuilder,
   ChannelType,
   RoleSelectMenuBuilder,
-  UserSelectMenuBuilder,
   MentionableSelectMenuBuilder,
   ChannelSelectMenuBuilder,
 } = require('discord.js');
 const Setup = require('../models/Setup');
-const logger = require('../utils/logger');
 
 async function getSetup(guildId) {
   let setup = await Setup.findOne({ guildId });
@@ -54,14 +52,7 @@ async function handleSetup(interaction) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  const airdropRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('airdrop_settings')
-      .setLabel('🎁 Airdrop Settings')
-      .setStyle(ButtonStyle.Success),
-  );
-
-  return interaction.editReply({ embeds: [embed], components: [trackerRow, modRow, tagRow, airdropRow] });
+  return interaction.editReply({ embeds: [embed], components: [trackerRow, modRow, tagRow] });
 }
 
 async function openTrackerSettings(interaction) {
@@ -269,129 +260,6 @@ async function handleTagLogMenu(interaction) {
   return interaction.reply({ content: 'Server Tag Logs channel has been removed.', ephemeral: true });
 }
 
-async function openAirdropSettings(interaction) {
-  await interaction.deferUpdate().catch(() => {});
-
-  let setup;
-  try {
-    setup = await getSetup(interaction.guildId);
-  } catch (err) {
-    logger.error(`Airdrop Settings: failed to load setup for guild ${interaction.guildId}: ${err.message}`);
-    return interaction.editReply({ content: 'Failed to load Airdrop Settings. Please try again.', components: [] }).catch(() => {});
-  }
-
-  const allowedUsersDisplay = setup.airdropAllowedUsers && setup.airdropAllowedUsers.length > 0
-    ? setup.airdropAllowedUsers.map((id) => `<@${id}>`).join(' ')
-    : 'None';
-  const allowedRolesDisplay = setup.airdropAllowedRoles && setup.airdropAllowedRoles.length > 0
-    ? setup.airdropAllowedRoles.map((id) => `<@&${id}>`).join(' ')
-    : 'None';
-  const staffUsersDisplay = setup.airdropTicketStaffUsers && setup.airdropTicketStaffUsers.length > 0
-    ? setup.airdropTicketStaffUsers.map((id) => `<@${id}>`).join(' ')
-    : 'None';
-  const staffRolesDisplay = setup.airdropTicketStaffRoles && setup.airdropTicketStaffRoles.length > 0
-    ? setup.airdropTicketStaffRoles.map((id) => `<@&${id}>`).join(' ')
-    : 'None';
-  const categoryDisplay = setup.airdropTicketCategoryId ? `<#${setup.airdropTicketCategoryId}>` : 'Not set';
-
-  const staffCombinedDisplay = [staffUsersDisplay, staffRolesDisplay]
-    .filter((d) => d !== 'None').join(' ') || 'None';
-
-  const embed = new EmbedBuilder()
-    .setTitle('🎁 Airdrop Settings')
-    .setColor(0x2b2d31)
-    .setDescription('Configure who can create Airdrops, who can manage tickets, and where tickets are created.')
-    .addFields(
-      { name: 'Users Allowed to Create Airdrops', value: allowedUsersDisplay, inline: false },
-      { name: 'Roles Allowed to Create Airdrops', value: allowedRolesDisplay, inline: false },
-      { name: 'Airdrop Ticket Staff', value: staffCombinedDisplay, inline: false },
-      { name: 'Airdrop Ticket Category', value: categoryDisplay, inline: false },
-    );
-
-  const allowedUsersMenu = new UserSelectMenuBuilder()
-    .setCustomId('airdrop_allowed_users')
-    .setPlaceholder('Select users allowed to create Airdrops')
-    .setMinValues(0)
-    .setMaxValues(25);
-
-  const allowedRolesMenu = new RoleSelectMenuBuilder()
-    .setCustomId('airdrop_allowed_roles')
-    .setPlaceholder('Select roles allowed to create Airdrops')
-    .setMinValues(0)
-    .setMaxValues(25);
-
-  const staffMenu = new MentionableSelectMenuBuilder()
-    .setCustomId('airdrop_staff')
-    .setPlaceholder('Select Airdrop ticket staff (users and/or roles)')
-    .setMinValues(0)
-    .setMaxValues(25);
-
-  const categoryMenu = new ChannelSelectMenuBuilder()
-    .setCustomId('airdrop_category')
-    .setPlaceholder('Search and select Airdrop Ticket Category')
-    .addChannelTypes(ChannelType.GuildCategory)
-    .setMinValues(0)
-    .setMaxValues(1);
-
-  const row1 = new ActionRowBuilder().addComponents(allowedUsersMenu);
-  const row2 = new ActionRowBuilder().addComponents(allowedRolesMenu);
-  const row3 = new ActionRowBuilder().addComponents(staffMenu);
-  const row4 = new ActionRowBuilder().addComponents(categoryMenu);
-  const row5 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
-  );
-
-  return interaction.editReply({ embeds: [embed], components: [row1, row2, row3, row4, row5] }).catch((err) => {
-    logger.error(`Airdrop Settings: failed to edit reply for guild ${interaction.guildId}: ${err.message}`);
-  });
-}
-
-async function handleAirdropAllowedUsers(interaction) {
-  const userIds = interaction.values || [];
-  await Setup.updateOne({ guildId: interaction.guildId }, { airdropAllowedUsers: userIds }, { upsert: true });
-  const display = userIds.length > 0 ? userIds.map((id) => `<@${id}>`).join(' ') : 'None';
-  return interaction.reply({ content: `Users allowed to create Airdrops updated: ${display}`, ephemeral: true });
-}
-
-async function handleAirdropAllowedRoles(interaction) {
-  const roleIds = interaction.values || [];
-  await Setup.updateOne({ guildId: interaction.guildId }, { airdropAllowedRoles: roleIds }, { upsert: true });
-  const display = roleIds.length > 0 ? roleIds.map((id) => `<@&${id}>`).join(' ') : 'None';
-  return interaction.reply({ content: `Roles allowed to create Airdrops updated: ${display}`, ephemeral: true });
-}
-
-async function handleAirdropStaff(interaction) {
-  const values = interaction.values || [];
-  const userIds = values.filter((v) => !v.startsWith('role:'));
-  const roleIds = values.filter((v) => v.startsWith('role:')).map((v) => v.slice(5));
-
-  try {
-    await Setup.updateOne(
-      { guildId: interaction.guildId },
-      { airdropTicketStaffUsers: userIds, airdropTicketStaffRoles: roleIds },
-      { upsert: true },
-    );
-  } catch (err) {
-    logger.error(`Airdrop staff: failed to save for guild ${interaction.guildId}: ${err.message}`);
-    return interaction.reply({ content: 'Failed to save Airdrop ticket staff. Please try again.', ephemeral: true });
-  }
-
-  const userDisplay = userIds.length > 0 ? userIds.map((id) => `<@${id}>`).join(' ') : '';
-  const roleDisplay = roleIds.length > 0 ? roleIds.map((id) => `<@&${id}>`).join(' ') : '';
-  const display = [userDisplay, roleDisplay].filter(Boolean).join(' ') || 'None';
-  return interaction.reply({ content: `Airdrop ticket staff updated: ${display}`, ephemeral: true });
-}
-
-async function handleAirdropCategory(interaction) {
-  const values = interaction.values || [];
-  const categoryId = values.length > 0 ? values[0] : null;
-  await Setup.updateOne({ guildId: interaction.guildId }, { airdropTicketCategoryId: categoryId }, { upsert: true });
-  if (categoryId) {
-    return interaction.reply({ content: `Airdrop Ticket Category set to <#${categoryId}>.`, ephemeral: true });
-  }
-  return interaction.reply({ content: 'Airdrop Ticket Category has been removed. New Airdrop claims will fail until a category is set.', ephemeral: true });
-}
-
 async function handleBack(interaction) {
   const embed = new EmbedBuilder()
     .setTitle('Bot Setup Dashboard')
@@ -419,14 +287,7 @@ async function handleBack(interaction) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  const airdropRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('airdrop_settings')
-      .setLabel('🎁 Airdrop Settings')
-      .setStyle(ButtonStyle.Success),
-  );
-
-  return interaction.update({ embeds: [embed], components: [trackerRow, modRow, tagRow, airdropRow] });
+  return interaction.update({ embeds: [embed], components: [trackerRow, modRow, tagRow] });
 }
 
 module.exports = {
@@ -434,7 +295,6 @@ module.exports = {
   openTrackerSettings,
   openModSettings,
   openTagSettings,
-  openAirdropSettings,
   handlePingMenu,
   handleQuarantineStaffMenu,
   handleQuarantineLogsMenu,
@@ -442,9 +302,5 @@ module.exports = {
   handleTagRoleMenu,
   handleTagRoleDisable,
   handleTagLogMenu,
-  handleAirdropAllowedUsers,
-  handleAirdropAllowedRoles,
-  handleAirdropStaff,
-  handleAirdropCategory,
   handleBack,
 };
