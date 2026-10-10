@@ -7,6 +7,7 @@ const { registerCommands, handleInteraction } = require('./handlers/commandHandl
 const { handleMessage } = require('./handlers/messageHandler');
 const { restoreTracker, setClient } = require('./tracker/trackerManager');
 const { checkAllMembers, handleUserUpdate, handleGuildMemberAdd } = require('./handlers/tagManager');
+const { restoreAirdrops, setClient: setAirdropClient } = require('./handlers/airdropManager');
 
 const client = new Client({
   intents: [
@@ -23,6 +24,7 @@ client.commands = new Collection();
 client.once('ready', async () => {
   logger.info(`Logged in as ${client.user.tag}`);
   setClient(client);
+  setAirdropClient(client);
 
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -48,6 +50,13 @@ client.once('ready', async () => {
     logger.info('Auto Tag Role member check complete');
   } catch (err) {
     logger.error('Failed to check members for tag roles:', err.message);
+  }
+
+  try {
+    await restoreAirdrops(client);
+    logger.info('Airdrop restore check complete');
+  } catch (err) {
+    logger.error('Failed to restore airdrops:', err.message);
   }
 });
 
