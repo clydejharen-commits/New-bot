@@ -2,6 +2,7 @@ const { Collection, REST, Routes } = require('discord.js');
 const { commands } = require('../commands');
 const { handleTrackStart } = require('../commands/track');
 const { handleTag } = require('../commands/tag');
+const { handleAfkSlash } = require('../commands/afk');
 const {
   handleSetup,
   openTrackerSettings,
@@ -99,6 +100,8 @@ async function handleInteraction(interaction) {
     }
 
     if (commandName === 'tag') return handleTag(interaction);
+
+    if (commandName === 'afk') return handleAfkSlash(interaction);
   }
 
   if (interaction.isButton()) {

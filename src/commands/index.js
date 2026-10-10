@@ -49,6 +49,13 @@ const tagCommand = new SlashCommandBuilder()
       .setDescription('Check if you are wearing this server\'s Server Tag'),
   );
 
-const commands = [trackCommand.toJSON(), setupCommand.toJSON(), quarantineCommand.toJSON(), unquarantineCommand.toJSON(), tagCommand.toJSON()];
+const afkCommand = new SlashCommandBuilder()
+  .setName('afk')
+  .setDescription('Set your AFK status')
+  .addStringOption((opt) =>
+    opt.setName('reason').setDescription('Why you are going AFK').setRequired(false),
+  );
+
+const commands = [trackCommand.toJSON(), setupCommand.toJSON(), quarantineCommand.toJSON(), unquarantineCommand.toJSON(), tagCommand.toJSON(), afkCommand.toJSON()];
 
 module.exports = { commands };
