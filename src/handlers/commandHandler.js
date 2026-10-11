@@ -4,6 +4,14 @@ const { handleTrackStart } = require('../commands/track');
 const { handleTag } = require('../commands/tag');
 const { handleAfkSlash } = require('../commands/afk');
 const {
+  sendQuarantineDM,
+  showAppealModal,
+  handleAppealModalSubmit,
+  handleAppealApprove,
+  showDenyModal,
+  handleAppealDenyModalSubmit,
+} = require('../handlers/appealManager');
+const {
   handleSetup,
   openTrackerSettings,
   openModSettings,
@@ -12,6 +20,7 @@ const {
   handleQuarantineStaffMenu,
   handleQuarantineLogsMenu,
   handleQuarantineRoleMenu,
+  handleAppealChannelMenu,
   handleTagRoleMenu,
   handleTagRoleDisable,
   handleTagLogMenu,
@@ -110,6 +119,19 @@ async function handleInteraction(interaction) {
     if (interaction.customId === 'tag_settings') return openTagSettings(interaction);
     if (interaction.customId === 'tag_role_disable') return handleTagRoleDisable(interaction);
     if (interaction.customId === 'setup_back') return handleBack(interaction);
+
+    if (interaction.customId.startsWith('appeal:')) {
+      const quarantineId = interaction.customId.split(':')[1];
+      return showAppealModal(interaction, quarantineId);
+    }
+    if (interaction.customId.startsWith('appeal_approve:')) {
+      const quarantineId = interaction.customId.split(':')[1];
+      return handleAppealApprove(interaction, quarantineId);
+    }
+    if (interaction.customId.startsWith('appeal_deny:')) {
+      const quarantineId = interaction.customId.split(':')[1];
+      return showDenyModal(interaction, quarantineId);
+    }
   }
 
   if (interaction.isStringSelectMenu()) {
@@ -119,6 +141,7 @@ async function handleInteraction(interaction) {
   if (interaction.isChannelSelectMenu()) {
     if (interaction.customId === 'mod_quarantine_logs') return handleQuarantineLogsMenu(interaction);
     if (interaction.customId === 'tag_log_menu') return handleTagLogMenu(interaction);
+    if (interaction.customId === 'mod_appeal_channel') return handleAppealChannelMenu(interaction);
   }
 
   if (interaction.isRoleSelectMenu()) {
@@ -129,6 +152,16 @@ async function handleInteraction(interaction) {
 
   if (interaction.isMentionableSelectMenu()) {
     if (interaction.customId === 'tracker_ping_menu') return handlePingMenu(interaction);
+  }
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId.startsWith('appeal_modal:')) {
+      const quarantineId = interaction.customId.split(':')[1];
+      return handleAppealModalSubmit(interaction, quarantineId);
+    }
+    if (interaction.customId.startsWith('appeal_deny_modal:')) {
+      const quarantineId = interaction.customId.split(':')[1];
+      return handleAppealDenyModalSubmit(interaction, quarantineId);
+    }
   }
 }
 

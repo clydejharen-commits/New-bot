@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const Quarantine = require('../models/Quarantine');
 const Setup = require('../models/Setup');
+const { sendQuarantineDM } = require('../handlers/appealManager');
 const logger = require('../utils/logger');
 
 async function getSetup(guildId) {
@@ -98,7 +99,7 @@ async function handleQuarantine(ctx) {
     return ctx.followUp(`Failed to quarantine that member: ${err.message}`);
   }
 
-  await Quarantine.create({
+  const quarantineRecord = await Quarantine.create({
     guildId: guild.id,
     userId: target.id,
     previousRoleIds,
@@ -108,6 +109,8 @@ async function handleQuarantine(ctx) {
   });
 
   await sendQuarantineLog(guild, setup, target, ctx.author, reason);
+
+  await sendQuarantineDM(guild, target, reason, quarantineRecord._id);
 
   const embed = new EmbedBuilder()
     .setTitle('Member Quarantined')

@@ -9,6 +9,7 @@ const SetupSchema = new Schema({
   tagRoleId: { type: String, default: null },
   tagRoleEnabled: { type: Boolean, default: false },
   tagLogChannelId: { type: String, default: null },
+  appealChannelId: { type: String, default: null },
 });
 
 module.exports = model('Setup', SetupSchema);
