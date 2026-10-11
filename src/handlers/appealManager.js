@@ -1,4 +1,12 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} = require('discord.js');
 const Appeal = require('../models/Appeal');
 const Quarantine = require('../models/Quarantine');
 const Setup = require('../models/Setup');
@@ -192,7 +200,12 @@ async function handleAppealApprove(interaction, quarantineId) {
   appeal.decidedAt = new Date();
   await appeal.save();
 
-  const quarantine = await Quarantine.findById(quarantineId);
+  let quarantine;
+  try {
+    quarantine = await Quarantine.findById(quarantineId);
+  } catch {
+    quarantine = null;
+  }
   if (!quarantine || !quarantine.active) {
     await updateAppealMessage(guild, appeal, 'Approved', interaction.user);
     return interaction.followUp({ content: 'The member is no longer quarantined. Appeal marked as approved.', ephemeral: true });

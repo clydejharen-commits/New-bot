@@ -4,7 +4,6 @@ const { handleTrackStart } = require('../commands/track');
 const { handleTag } = require('../commands/tag');
 const { handleAfkSlash } = require('../commands/afk');
 const {
-  sendQuarantineDM,
   showAppealModal,
   handleAppealModalSubmit,
   handleAppealApprove,
