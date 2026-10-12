@@ -1,1 +1,330 @@
-const {\n  ActionRowBuilder,\n  ButtonBuilder,\n  ButtonStyle,\n  EmbedBuilder,\n  StringSelectMenuBuilder,\n  ChannelType,\n  RoleSelectMenuBuilder,\n  MentionableSelectMenuBuilder,\n  ChannelSelectMenuBuilder,\n} = require('discord.js');\nconst Setup = require('../models/Setup');\n\nasync function getSetup(guildId) {\n  let setup = await Setup.findOne({ guildId });\n  if (!setup) {\n    setup = await Setup.create({ guildId });\n  }\n  return setup;\n}\n\nasync function handleSetup(interaction) {\n  if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {\n    return interaction.reply({ content: 'You need Administrator permission to use this command.', ephemeral: true });\n  }\n\n  await interaction.deferReply({ ephemeral: true });\n\n  const embed = new EmbedBuilder()\n    .setTitle('Bot Setup Dashboard')\n    .setColor(0x2b2d31)\n    .setDescription('Configure the bot below.');\n\n  const trackerRow = new ActionRowBuilder().addComponents(\n    new ButtonBuilder()\n      .setCustomId('tracker_settings')\n      .setLabel('⚙️ Tracker Settings')\n      .setStyle(ButtonStyle.Primary),\n  );\n\n  const modRow = new ActionRowBuilder().addComponents(\n    new ButtonBuilder()\n      .setCustomId('mod_settings')\n      .setLabel('🛡️ Mod Settings')\n      .setStyle(ButtonStyle.Secondary),\n  );\n\n  const tagRow = new ActionRowBuilder().addComponents(\n    new ButtonBuilder()\n      .setCustomId('tag_settings')\n      .setLabel('🏷️ Auto Tag Role')\n      .setStyle(ButtonStyle.Secondary),\n  );\n\n  return interaction.editReply({ embeds: [embed], components: [trackerRow, modRow, tagRow] });\n}\n\nasync function openTrackerSettings(interaction) {\n  const setup = await getSetup(interaction.guildId);\n\n  const pingDisplay = setup.trackerPingIds && setup.trackerPingIds.length > 0\n    ? setup.trackerPingIds.map((id) => {\n        if (id.startsWith('role:')) return `<@&${id.slice(5)}>`;\n        return `<@${id}>`;\n      }).join(' ')\n    : 'Not set';\n\n  const embed = new EmbedBuilder()\n    .setTitle('⚙️ Tracker Settings')\n    .setColor(0x2b2d31)\n    .setDescription(\n      'Select the users and/or roles to ping when the milestone is reached.\\n' +\n      'You can search and select multiple users and roles.\\n\\n' +\n      '⚠️ Disclaimer: The tracking embed is only sent to the channel where the command is executed, so it will not always send to the same channel.',\n    )\n    .addFields(\n      {\n        name: 'Current Ping Targets',\n        value: pingDisplay,\n        inline: false,\n      },\n    );\n\n  const pingMenu = new MentionableSelectMenuBuilder()\n    .setCustomId('tracker_ping_menu')\n    .setPlaceholder('Select users and/or roles to ping on milestone')\n    .setMinValues(0)\n    .setMaxValues(25);\n\n  const row1 = new ActionRowBuilder().addComponents(pingMenu);\n\n  const backButton = new ActionRowBuilder().addComponents(\n    new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),\n  );\n\n  return interaction.update({ embeds: [embed], components: [row1, backButton] });\n}\n\nasync function openModSettings(interaction) {\n  const setup = await getSetup(interaction.guildId);\n\n  const embed = new EmbedBuilder()\n    .setTitle('Mod Settings')\n    .setColor(0x2b2d31)\n    .setDescription('Configure the Quarantine System below.')\n    .addFields(\n      {\n        name: 'Quarantine Staff',\n        value: setup.quarantineStaffRoleId ? `<@&${setup.quarantineStaffRoleId}>` : 'Not set',\n        inline: true,\n      },\n      {\n        name: 'Quarantine Logs',\n        value: setup.quarantineLogChannelId ? `<#${setup.quarantineLogChannelId}>` : 'Not set',\n        inline: true,\n      },\n      {\n        name: 'Quarantine Role',\n        value: setup.quarantineRoleId ? `<@&${setup.quarantineRoleId}>` : 'Not set',\n        inline: true,\n      },\n      {\n        name: 'Appeal Messages Channel',\n        value: setup.appealChannelId ? `<#${setup.appealChannelId}>` : 'Not set',\n        inline: true,\n      },\n    );\n\n  const staffMenu = new RoleSelectMenuBuilder()\n    .setCustomId('mod_quarantine_staff')\n    .setPlaceholder('Select Quarantine Staff role');\n\n  const logMenu = new ChannelSelectMenuBuilder()\n    .setCustomId('mod_quarantine_logs')\n    .setPlaceholder('Search and select Quarantine Logs channel')\n    .addChannelTypes(ChannelType.GuildText)\n    .setMinValues(1)\n    .setMaxValues(1);\n\n  const quarantineRoleMenu = new RoleSelectMenuBuilder()\n    .setCustomId('mod_quarantine_role')\n    .setPlaceholder('Select Quarantine Role');\n\n  const appealChannelMenu = new ChannelSelectMenuBuilder()\n    .setCustomId('mod_appeal_channel')\n    .setPlaceholder('Select Appeal Messages Channel')\n    .addChannelTypes(ChannelType.GuildText)\n    .setMinValues(0)\n    .setMaxValues(1);\n\n  const row1 = new ActionRowBuilder().addComponents(staffMenu);\n  const row2 = new ActionRowBuilder().addComponents(logMenu);\n  const row3 = new ActionRowBuilder().addComponents(quarantineRoleMenu);\n  const row4 = new ActionRowBuilder().addComponents(appealChannelMenu);\n  const row5 = new ActionRowBuilder().addComponents(\n    new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),\n  );\n\n  return interaction.update({ embeds: [embed], components: [row1, row2, row3, row4, row5] });\n}\n\nasync function handlePingMenu(interaction) {\n  const values = interaction.values || [];\n\n  const pingIds = values.map((v) => {\n    if (v.startsWith('role:')) return v;\n    return v;\n  });\n\n  await Setup.updateOne({ guildId: interaction.guildId }, { trackerPingIds: pingIds }, { upsert: true });\n\n  const display = pingIds.length > 0\n    ? pingIds.map((id) => {\n        if (id.startsWith('role:')) return `<@&${id.slice(5)}>`;\n        return `<@${id}>`;\n      }).join(' ')\n    : 'None';\n\n  return interaction.reply({ content: `Milestone ping targets updated: ${display}`, ephemeral: true });\n}\n\nasync function handleQuarantineStaffMenu(interaction) {\n  const roleId = interaction.values[0];\n  await Setup.updateOne({ guildId: interaction.guildId }, { quarantineStaffRoleId: roleId }, { upsert: true });\n  return interaction.reply({ content: `Quarantine Staff role set to <@&${roleId}>.`, ephemeral: true });\n}\n\nasync function handleQuarantineLogsMenu(interaction) {\n  const channelId = interaction.values[0];\n  await Setup.updateOne({ guildId: interaction.guildId }, { quarantineLogChannelId: channelId }, { upsert: true });\n  return interaction.reply({ content: `Quarantine Logs channel set to <#${channelId}>.`, ephemeral: true });\n}\n\nasync function handleQuarantineRoleMenu(interaction) {\n  const roleId = interaction.values[0];\n  await Setup.updateOne({ guildId: interaction.guildId }, { quarantineRoleId: roleId }, { upsert: true });\n  return interaction.reply({ content: `Quarantine Role set to <@&${roleId}>.`, ephemeral: true });\n}\n\nasync function handleAppealChannelMenu(interaction) {\n  const values = interaction.values || [];\n  const channelId = values.length > 0 ? values[0] : null;\n  await Setup.updateOne({ guildId: interaction.guildId }, { appealChannelId: channelId }, { upsert: true });\n  if (channelId) {\n    return interaction.reply({ content: `Appeal Messages Channel set to <#${channelId}>.`, ephemeral: true });\n  }\n  return interaction.reply({ content: 'Appeal Messages Channel has been removed.', ephemeral: true });\n}\n\nasync function openTagSettings(interaction) {\n  const setup = await getSetup(interaction.guildId);\n\n  const status = setup.tagRoleEnabled && setup.tagRoleId\n    ? `Enabled — Role: <@&${setup.tagRoleId}>`\n    : 'Disabled';\n\n  const logDisplay = setup.tagLogChannelId ? `<#${setup.tagLogChannelId}>` : 'Not set';\n\n  const embed = new EmbedBuilder()\n    .setTitle('🏷️ Auto Tag Role')\n    .setColor(0x2b2d31)\n    .setDescription(\n      'Configure the role that is automatically given to members wearing this server\\'s Server Tag.\\n\\n' +\n      'When a member equips this server\\'s tag, they receive the role. When they remove it or switch to another server\\'s tag, the role is removed.',\n    )\n    .addFields(\n      {\n        name: 'Status',\n        value: status,\n        inline: false,\n      },\n      {\n        name: 'Server Tag Logs',\n        value: logDisplay,\n        inline: false,\n      },\n    );\n\n  const roleMenu = new RoleSelectMenuBuilder()\n    .setCustomId('tag_role_menu')\n    .setPlaceholder('Select the Server Tag Role');\n\n  const logMenu = new ChannelSelectMenuBuilder()\n    .setCustomId('tag_log_menu')\n    .setPlaceholder('Search and select Server Tag Logs channel')\n    .addChannelTypes(ChannelType.GuildText)\n    .setMinValues(0)\n    .setMaxValues(1);\n\n  const disableButton = new ButtonBuilder()\n    .setCustomId('tag_role_disable')\n    .setLabel('Disable Auto Tag Role')\n    .setStyle(ButtonStyle.Danger);\n\n  const row1 = new ActionRowBuilder().addComponents(roleMenu);\n  const row2 = new ActionRowBuilder().addComponents(logMenu);\n  const row3 = new ActionRowBuilder().addComponents(\n    disableButton,\n    new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),\n  );\n\n  return interaction.update({ embeds: [embed], components: [row1, row2, row3] });\n}\n\nasync function handleTagRoleMenu(interaction) {\n  const roleId = interaction.values[0];\n  await Setup.updateOne({ guildId: interaction.guildId }, { tagRoleId: roleId, tagRoleEnabled: true }, { upsert: true });\n  return interaction.reply({ content: `Auto Tag Role set to <@&${roleId}>. Members wearing this server's tag will receive the role automatically.`, ephemeral: true });\n}\n\nasync function handleTagRoleDisable(interaction) {\n  await Setup.updateOne({ guildId: interaction.guildId }, { tagRoleEnabled: false, tagRoleId: null }, { upsert: true });\n  return interaction.reply({ content: 'Auto Tag Role has been disabled.', ephemeral: true });\n}\n\nasync function handleTagLogMenu(interaction) {\n  const values = interaction.values || [];\n  const channelId = values.length > 0 ? values[0] : null;\n  await Setup.updateOne({ guildId: interaction.guildId }, { tagLogChannelId: channelId }, { upsert: true });\n  if (channelId) {\n    return interaction.reply({ content: `Server Tag Logs channel set to <#${channelId}>.`, ephemeral: true });\n  }\n  return interaction.reply({ content: 'Server Tag Logs channel has been removed.', ephemeral: true });\n}\n\nasync function handleBack(interaction) {\n  const embed = new EmbedBuilder()\n    .setTitle('Bot Setup Dashboard')\n    .setColor(0x2b2d31)\n    .setDescription('Configure the bot below.');\n\n  const trackerRow = new ActionRowBuilder().addComponents(\n    new ButtonBuilder()\n      .setCustomId('tracker_settings')\n      .setLabel('⚙️ Tracker Settings')\n      .setStyle(ButtonStyle.Primary),\n  );\n\n  const modRow = new ActionRowBuilder().addComponents(\n    new ButtonBuilder()\n      .setCustomId('mod_settings')\n      .setLabel('🛡️ Mod Settings')\n      .setStyle(ButtonStyle.Secondary),\n  );\n\n  const tagRow = new ActionRowBuilder().addComponents(\n    new ButtonBuilder()\n      .setCustomId('tag_settings')\n      .setLabel('🏷️ Auto Tag Role')\n      .setStyle(ButtonStyle.Secondary),\n  );\n\n  return interaction.update({ embeds: [embed], components: [trackerRow, modRow, tagRow] });\n}\n\nmodule.exports = {\n  handleSetup,\n  openTrackerSettings,\n  openModSettings,\n  openTagSettings,\n  handlePingMenu,\n  handleQuarantineStaffMenu,\n  handleQuarantineLogsMenu,\n  handleQuarantineRoleMenu,\n  handleAppealChannelMenu,\n  handleTagRoleMenu,\n  handleTagRoleDisable,\n  handleTagLogMenu,\n  handleBack,\n};\n
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  StringSelectMenuBuilder,
+  ChannelType,
+  RoleSelectMenuBuilder,
+  MentionableSelectMenuBuilder,
+  ChannelSelectMenuBuilder,
+} = require('discord.js');
+const Setup = require('../models/Setup');
+
+async function getSetup(guildId) {
+  let setup = await Setup.findOne({ guildId });
+  if (!setup) {
+    setup = await Setup.create({ guildId });
+  }
+  return setup;
+}
+
+async function handleSetup(interaction) {
+  if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
+    return interaction.reply({ content: 'You need Administrator permission to use this command.', ephemeral: true });
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const embed = new EmbedBuilder()
+    .setTitle('Bot Setup Dashboard')
+    .setColor(0x2b2d31)
+    .setDescription('Configure the bot below.');
+
+  const trackerRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('tracker_settings')
+      .setLabel('⚙️ Tracker Settings')
+      .setStyle(ButtonStyle.Primary),
+  );
+
+  const modRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('mod_settings')
+      .setLabel('🛡️ Mod Settings')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  const tagRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('tag_settings')
+      .setLabel('🏷️ Auto Tag Role')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.editReply({ embeds: [embed], components: [trackerRow, modRow, tagRow] });
+}
+
+async function openTrackerSettings(interaction) {
+  const setup = await getSetup(interaction.guildId);
+
+  const pingDisplay = setup.trackerPingIds && setup.trackerPingIds.length > 0
+    ? setup.trackerPingIds.map((id) => {
+        if (id.startsWith('role:')) return `<@&${id.slice(5)}>`;
+        return `<@${id}>`;
+      }).join(' ')
+    : 'Not set';
+
+  const embed = new EmbedBuilder()
+    .setTitle('⚙️ Tracker Settings')
+    .setColor(0x2b2d31)
+    .setDescription(
+      'Select the users and/or roles to ping when the milestone is reached.\n' +
+      'You can search and select multiple users and roles.\n\n' +
+      '⚠️ Disclaimer: The tracking embed is only sent to the channel where the command is executed, so it will not always send to the same channel.',
+    )
+    .addFields(
+      {
+        name: 'Current Ping Targets',
+        value: pingDisplay,
+        inline: false,
+      },
+    );
+
+  const pingMenu = new MentionableSelectMenuBuilder()
+    .setCustomId('tracker_ping_menu')
+    .setPlaceholder('Select users and/or roles to ping on milestone')
+    .setMinValues(0)
+    .setMaxValues(25);
+
+  const row1 = new ActionRowBuilder().addComponents(pingMenu);
+
+  const backButton = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.update({ embeds: [embed], components: [row1, backButton] });
+}
+
+async function openModSettings(interaction) {
+  const setup = await getSetup(interaction.guildId);
+
+  const embed = new EmbedBuilder()
+    .setTitle('Mod Settings')
+    .setColor(0x2b2d31)
+    .setDescription('Configure the Quarantine System below.')
+    .addFields(
+      {
+        name: 'Quarantine Staff',
+        value: setup.quarantineStaffRoleId ? `<@&${setup.quarantineStaffRoleId}>` : 'Not set',
+        inline: true,
+      },
+      {
+        name: 'Quarantine Logs',
+        value: setup.quarantineLogChannelId ? `<#${setup.quarantineLogChannelId}>` : 'Not set',
+        inline: true,
+      },
+      {
+        name: 'Quarantine Role',
+        value: setup.quarantineRoleId ? `<@&${setup.quarantineRoleId}>` : 'Not set',
+        inline: true,
+      },
+      {
+        name: 'Appeal Messages Channel',
+        value: setup.appealChannelId ? `<#${setup.appealChannelId}>` : 'Not set',
+        inline: true,
+      },
+    );
+
+  const staffMenu = new RoleSelectMenuBuilder()
+    .setCustomId('mod_quarantine_staff')
+    .setPlaceholder('Select Quarantine Staff role');
+
+  const logMenu = new ChannelSelectMenuBuilder()
+    .setCustomId('mod_quarantine_logs')
+    .setPlaceholder('Search and select Quarantine Logs channel')
+    .addChannelTypes(ChannelType.GuildText)
+    .setMinValues(1)
+    .setMaxValues(1);
+
+  const quarantineRoleMenu = new RoleSelectMenuBuilder()
+    .setCustomId('mod_quarantine_role')
+    .setPlaceholder('Select Quarantine Role');
+
+  const appealChannelMenu = new ChannelSelectMenuBuilder()
+    .setCustomId('mod_appeal_channel')
+    .setPlaceholder('Select Appeal Messages Channel')
+    .addChannelTypes(ChannelType.GuildText)
+    .setMinValues(0)
+    .setMaxValues(1);
+
+  const row1 = new ActionRowBuilder().addComponents(staffMenu);
+  const row2 = new ActionRowBuilder().addComponents(logMenu);
+  const row3 = new ActionRowBuilder().addComponents(quarantineRoleMenu);
+  const row4 = new ActionRowBuilder().addComponents(appealChannelMenu);
+  const row5 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.update({ embeds: [embed], components: [row1, row2, row3, row4, row5] });
+}
+
+async function handlePingMenu(interaction) {
+  const values = interaction.values || [];
+
+  const pingIds = values.map((v) => {
+    if (v.startsWith('role:')) return v;
+    return v;
+  });
+
+  await Setup.updateOne({ guildId: interaction.guildId }, { trackerPingIds: pingIds }, { upsert: true });
+
+  const display = pingIds.length > 0
+    ? pingIds.map((id) => {
+        if (id.startsWith('role:')) return `<@&${id.slice(5)}>`;
+        return `<@${id}>`;
+      }).join(' ')
+    : 'None';
+
+  return interaction.reply({ content: `Milestone ping targets updated: ${display}`, ephemeral: true });
+}
+
+async function handleQuarantineStaffMenu(interaction) {
+  const roleId = interaction.values[0];
+  await Setup.updateOne({ guildId: interaction.guildId }, { quarantineStaffRoleId: roleId }, { upsert: true });
+  return interaction.reply({ content: `Quarantine Staff role set to <@&${roleId}>.`, ephemeral: true });
+}
+
+async function handleQuarantineLogsMenu(interaction) {
+  const channelId = interaction.values[0];
+  await Setup.updateOne({ guildId: interaction.guildId }, { quarantineLogChannelId: channelId }, { upsert: true });
+  return interaction.reply({ content: `Quarantine Logs channel set to <#${channelId}>.`, ephemeral: true });
+}
+
+async function handleQuarantineRoleMenu(interaction) {
+  const roleId = interaction.values[0];
+  await Setup.updateOne({ guildId: interaction.guildId }, { quarantineRoleId: roleId }, { upsert: true });
+  return interaction.reply({ content: `Quarantine Role set to <@&${roleId}>.`, ephemeral: true });
+}
+
+async function handleAppealChannelMenu(interaction) {
+  const values = interaction.values || [];
+  const channelId = values.length > 0 ? values[0] : null;
+  await Setup.updateOne({ guildId: interaction.guildId }, { appealChannelId: channelId }, { upsert: true });
+  if (channelId) {
+    return interaction.reply({ content: `Appeal Messages Channel set to <#${channelId}>.`, ephemeral: true });
+  }
+  return interaction.reply({ content: 'Appeal Messages Channel has been removed.', ephemeral: true });
+}
+
+async function openTagSettings(interaction) {
+  const setup = await getSetup(interaction.guildId);
+
+  const status = setup.tagRoleEnabled && setup.tagRoleId
+    ? `Enabled — Role: <@&${setup.tagRoleId}>`
+    : 'Disabled';
+
+  const logDisplay = setup.tagLogChannelId ? `<#${setup.tagLogChannelId}>` : 'Not set';
+
+  const embed = new EmbedBuilder()
+    .setTitle('🏷️ Auto Tag Role')
+    .setColor(0x2b2d31)
+    .setDescription(
+      'Configure the role that is automatically given to members wearing this server\'s Server Tag.\n\n' +
+      'When a member equips this server\'s tag, they receive the role. When they remove it or switch to another server\'s tag, the role is removed.',
+    )
+    .addFields(
+      {
+        name: 'Status',
+        value: status,
+        inline: false,
+      },
+      {
+        name: 'Server Tag Logs',
+        value: logDisplay,
+        inline: false,
+      },
+    );
+
+  const roleMenu = new RoleSelectMenuBuilder()
+    .setCustomId('tag_role_menu')
+    .setPlaceholder('Select the Server Tag Role');
+
+  const logMenu = new ChannelSelectMenuBuilder()
+    .setCustomId('tag_log_menu')
+    .setPlaceholder('Search and select Server Tag Logs channel')
+    .addChannelTypes(ChannelType.GuildText)
+    .setMinValues(0)
+    .setMaxValues(1);
+
+  const disableButton = new ButtonBuilder()
+    .setCustomId('tag_role_disable')
+    .setLabel('Disable Auto Tag Role')
+    .setStyle(ButtonStyle.Danger);
+
+  const row1 = new ActionRowBuilder().addComponents(roleMenu);
+  const row2 = new ActionRowBuilder().addComponents(logMenu);
+  const row3 = new ActionRowBuilder().addComponents(
+    disableButton,
+    new ButtonBuilder().setCustomId('setup_back').setLabel('Back').setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.update({ embeds: [embed], components: [row1, row2, row3] });
+}
+
+async function handleTagRoleMenu(interaction) {
+  const roleId = interaction.values[0];
+  await Setup.updateOne({ guildId: interaction.guildId }, { tagRoleId: roleId, tagRoleEnabled: true }, { upsert: true });
+  return interaction.reply({ content: `Auto Tag Role set to <@&${roleId}>. Members wearing this server's tag will receive the role automatically.`, ephemeral: true });
+}
+
+async function handleTagRoleDisable(interaction) {
+  await Setup.updateOne({ guildId: interaction.guildId }, { tagRoleEnabled: false, tagRoleId: null }, { upsert: true });
+  return interaction.reply({ content: 'Auto Tag Role has been disabled.', ephemeral: true });
+}
+
+async function handleTagLogMenu(interaction) {
+  const values = interaction.values || [];
+  const channelId = values.length > 0 ? values[0] : null;
+  await Setup.updateOne({ guildId: interaction.guildId }, { tagLogChannelId: channelId }, { upsert: true });
+  if (channelId) {
+    return interaction.reply({ content: `Server Tag Logs channel set to <#${channelId}>.`, ephemeral: true });
+  }
+  return interaction.reply({ content: 'Server Tag Logs channel has been removed.', ephemeral: true });
+}
+
+async function handleBack(interaction) {
+  const embed = new EmbedBuilder()
+    .setTitle('Bot Setup Dashboard')
+    .setColor(0x2b2d31)
+    .setDescription('Configure the bot below.');
+
+  const trackerRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('tracker_settings')
+      .setLabel('⚙️ Tracker Settings')
+      .setStyle(ButtonStyle.Primary),
+  );
+
+  const modRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('mod_settings')
+      .setLabel('🛡️ Mod Settings')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  const tagRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('tag_settings')
+      .setLabel('🏷️ Auto Tag Role')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.update({ embeds: [embed], components: [trackerRow, modRow, tagRow] });
+}
+
+module.exports = {
+  handleSetup,
+  openTrackerSettings,
+  openModSettings,
+  openTagSettings,
+  handlePingMenu,
+  handleQuarantineStaffMenu,
+  handleQuarantineLogsMenu,
+  handleQuarantineRoleMenu,
+  handleAppealChannelMenu,
+  handleTagRoleMenu,
+  handleTagRoleDisable,
+  handleTagLogMenu,
+  handleBack,
+};
