@@ -16,17 +16,10 @@ async function deployCommands() {
   const rest = new REST({ version: '10' }).setToken(token);
 
   try {
-    const guildId = process.env.GUILD_ID;
-
-    if (guildId) {
-      await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
-      logger.info(`Registered ${commands.length} guild commands to ${guildId}`);
-    } else {
-      await rest.put(Routes.applicationCommands(clientId), { body: commands });
-      logger.info(`Registered ${commands.length} global commands`);
-    }
+    await rest.put(Routes.applicationCommands(clientId), { body: commands });
+    logger.info(`Registered ${commands.length} global slash commands.`);
   } catch (err) {
-    logger.error('Failed to deploy commands:', err.message);
+    logger.error('Failed to deploy global commands:', err.message);
     process.exit(1);
   }
 }

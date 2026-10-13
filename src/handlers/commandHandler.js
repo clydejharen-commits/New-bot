@@ -67,25 +67,20 @@ async function registerCommands(client) {
 
   const token = process.env.DISCORD_TOKEN;
   const clientId = process.env.CLIENT_ID;
-  const guildId = process.env.GUILD_ID;
 
   if (!token || !clientId) {
     logger.error('Missing DISCORD_TOKEN or CLIENT_ID — slash commands will not be registered with Discord');
     return;
   }
 
-  if (!guildId) {
-    logger.warn('GUILD_ID is not set — commands will be registered globally instead of to a specific guild');
-  }
-
   const rest = new REST({ version: '10' }).setToken(token);
-  const route = guildId
-    ? Routes.applicationGuildCommands(clientId, guildId)
-    : Routes.applicationCommands(clientId);
 
-  await rest.put(route, { body: commands });
-
-  logger.info(`Successfully registered ${commands.length} slash commands${guildId ? ` to guild ${guildId}` : ' globally'}.`);
+  try {
+    await rest.put(Routes.applicationCommands(clientId), { body: commands });
+    logger.info(`Successfully registered ${commands.length} slash commands globally.`);
+  } catch (err) {
+    logger.error('Failed to register global slash commands:', err.message);
+  }
 }
 
 async function handleInteraction(interaction) {

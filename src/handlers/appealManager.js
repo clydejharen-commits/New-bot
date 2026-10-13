@@ -54,30 +54,29 @@ async function sendQuarantineDM(guild, target, reason, quarantineId) {
 }
 
 async function showAppealModal(interaction, quarantineId) {
-  const guild = interaction.guild;
-
   let quarantine;
   try {
     quarantine = await Quarantine.findById(quarantineId);
   } catch (err) {
-    return interaction.reply({ content: 'Could not find the quarantine record. You may not be able to appeal this quarantine.', ephemeral: true });
+    logger.error(`showAppealModal: failed to fetch quarantine ${quarantineId}: ${err.message}`);
+    return interaction.reply({ content: 'Could not find the quarantine record. You may not be able to appeal this quarantine.', ephemeral: true }).catch(() => {});
   }
 
   if (!quarantine) {
-    return interaction.reply({ content: 'That quarantine record no longer exists. You cannot appeal it.', ephemeral: true });
+    return interaction.reply({ content: 'That quarantine record no longer exists. You cannot appeal it.', ephemeral: true }).catch(() => {});
   }
 
   if (quarantine.userId !== interaction.user.id) {
-    return interaction.reply({ content: 'Only the quarantined member can submit an appeal for their own quarantine.', ephemeral: true });
+    return interaction.reply({ content: 'Only the quarantined member can submit an appeal for their own quarantine.', ephemeral: true }).catch(() => {});
   }
 
   if (!quarantine.active) {
-    return interaction.reply({ content: 'You are no longer quarantined, so you cannot appeal that quarantine.', ephemeral: true });
+    return interaction.reply({ content: 'You are no longer quarantined, so you cannot appeal that quarantine.', ephemeral: true }).catch(() => {});
   }
 
-  const existing = await Appeal.findOne({ guildId: guild.id, userId: interaction.user.id, status: 'pending' });
+  const existing = await Appeal.findOne({ guildId: quarantine.guildId, userId: interaction.user.id, status: 'pending' });
   if (existing) {
-    return interaction.reply({ content: 'You already have a pending appeal. Please wait for staff to review it.', ephemeral: true });
+    return interaction.reply({ content: 'You already have a pending appeal. Please wait for staff to review it.', ephemeral: true }).catch(() => {});
   }
 
   const modal = new ModalBuilder()
@@ -100,39 +99,51 @@ async function showAppealModal(interaction, quarantineId) {
 }
 
 async function handleAppealModalSubmit(interaction, quarantineId) {
-  const guild = interaction.guild;
+  const client = interaction.client;
+
   const appealReason = interaction.fields.getTextInputValue('appeal_explanation');
 
   if (!appealReason || appealReason.trim().length === 0) {
-    return interaction.reply({ content: 'You must provide an explanation for your appeal.', ephemeral: true });
-  }
-
-  const setup = await getSetup(guild.id);
-
-  if (!setup.appealChannelId) {
-    return interaction.reply({ content: 'No appeal channel has been configured. An administrator needs to set one up via `/setup` → Mod Settings → Appeal Messages Channel.', ephemeral: true });
+    return interaction.reply({ content: 'You must provide an explanation for your appeal.', ephemeral: true }).catch(() => {});
   }
 
   let quarantine;
   try {
     quarantine = await Quarantine.findById(quarantineId);
-  } catch {
-    quarantine = null;
+  } catch (err) {
+    logger.error(`handleAppealModalSubmit: failed to fetch quarantine ${quarantineId}: ${err.message}`);
+    return interaction.reply({ content: 'Could not find the quarantine record. Your appeal could not be submitted.', ephemeral: true }).catch(() => {});
   }
 
   if (!quarantine || !quarantine.active) {
-    return interaction.reply({ content: 'You are no longer quarantined, so you cannot appeal that quarantine.', ephemeral: true });
+    return interaction.reply({ content: 'You are no longer quarantined, so you cannot appeal that quarantine.', ephemeral: true }).catch(() => {});
   }
 
-  const existing = await Appeal.findOne({ guildId: guild.id, userId: interaction.user.id, status: 'pending' });
+  const guildId = quarantine.guildId;
+  const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+  if (!guild) {
+    logger.error(`handleAppealModalSubmit: guild ${guildId} not found for quarantine ${quarantineId}`);
+    return interaction.reply({ content: 'The server associated with your quarantine could not be found. Please contact a staff member.', ephemeral: true }).catch(() => {});
+  }
+
+  const setup = await getSetup(guildId);
+
+  if (!setup.appealChannelId) {
+    return interaction.reply({ content: 'No appeal channel has been configured. An administrator needs to set one up via `/setup` → Mod Settings → Appeal Messages Channel.', ephemeral: true }).catch(() => {});
+  }
+
+  const existing = await Appeal.findOne({ guildId, userId: interaction.user.id, status: 'pending' });
   if (existing) {
-    return interaction.reply({ content: 'You already have a pending appeal. Please wait for staff to review it.', ephemeral: true });
+    return interaction.reply({ content: 'You already have a pending appeal. Please wait for staff to review it.', ephemeral: true }).catch(() => {});
   }
 
   const appealChannel = guild.channels.cache.get(setup.appealChannelId) || await guild.channels.fetch(setup.appealChannelId).catch(() => null);
   if (!appealChannel) {
-    return interaction.reply({ content: 'The configured appeal channel no longer exists. An administrator needs to reconfigure it via `/setup`.', ephemeral: true });
+    logger.error(`handleAppealModalSubmit: appeal channel ${setup.appealChannelId} not found in guild ${guildId}`);
+    return interaction.reply({ content: 'The configured appeal channel no longer exists. An administrator needs to reconfigure it via `/setup`.', ephemeral: true }).catch(() => {});
   }
+
+  await interaction.reply({ content: 'Submitting your appeal...', ephemeral: true }).catch(() => {});
 
   const embed = new EmbedBuilder()
     .setTitle('📋 Quarantine Appeal')
@@ -161,12 +172,12 @@ async function handleAppealModalSubmit(interaction, quarantineId) {
   try {
     appealMessage = await appealChannel.send({ embeds: [embed], components: [row] });
   } catch (err) {
-    logger.error(`Failed to send appeal to channel: ${err.message}`);
-    return interaction.reply({ content: 'Failed to submit your appeal. Please try again later or contact a staff member.', ephemeral: true });
+    logger.error(`handleAppealModalSubmit: failed to send appeal to channel: ${err.message}`);
+    return interaction.editReply({ content: 'Failed to submit your appeal. Please try again later or contact a staff member.' }).catch(() => {});
   }
 
   await Appeal.create({
-    guildId: guild.id,
+    guildId,
     userId: interaction.user.id,
     quarantineId: quarantine._id,
     quarantineReason: quarantine.reason,
@@ -176,7 +187,7 @@ async function handleAppealModalSubmit(interaction, quarantineId) {
     appealChannelId: appealChannel.id,
   });
 
-  return interaction.reply({ content: 'Your appeal has been submitted. Staff will review it and you will be notified of the decision.', ephemeral: true });
+  return interaction.editReply({ content: 'Your appeal has been submitted. Staff will review it and you will be notified of the decision.' }).catch(() => {});
 }
 
 async function handleAppealApprove(interaction, quarantineId) {

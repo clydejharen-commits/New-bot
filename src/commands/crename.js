@@ -1,7 +1,18 @@
 const { PermissionFlagsBits } = require('discord.js');
+const logger = require('../utils/logger');
 
 async function handleCrename(message, args) {
-  if (!message.memberPermissions || !message.memberPermissions.has(PermissionFlagsBits.ManageChannels)) {
+  let member = message.member;
+  if (!member) {
+    try {
+      member = await message.guild.members.fetch(message.author.id);
+    } catch (err) {
+      logger.error(`crename: failed to fetch member ${message.author.id}: ${err.message}`);
+      return message.reply('Could not verify your permissions. Please try again.');
+    }
+  }
+
+  if (!member.permissions || !member.permissions.has(PermissionFlagsBits.ManageChannels)) {
     return message.reply('You need the **Manage Channels** permission to use this command.');
   }
 
@@ -23,6 +34,7 @@ async function handleCrename(message, args) {
   try {
     await message.channel.setName(name, `Requested by ${message.author.tag}`);
   } catch (err) {
+    logger.error(`crename: failed to rename channel ${message.channel.id}: ${err.message}`);
     return message.reply(`Failed to rename channel: ${err.message}`);
   }
 
