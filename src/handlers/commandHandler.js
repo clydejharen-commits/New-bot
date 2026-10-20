@@ -26,6 +26,12 @@ const {
   handleBack,
 } = require('../commands/setup');
 const { handleQuarantine, handleUnquarantine } = require('../commands/quarantine');
+const {
+  handleCopyPermsSourceMenu,
+  handleCopyPermsDestMenu,
+  handleCopyPermsConfirm,
+  handleCopyPermsCancel,
+} = require('../commands/copyperms');
 const logger = require('../utils/logger');
 
 function wrapInteractionCtx(interaction) {
@@ -126,6 +132,12 @@ async function handleInteraction(interaction) {
       const quarantineId = interaction.customId.split(':')[1];
       return showDenyModal(interaction, quarantineId);
     }
+    if (interaction.customId.startsWith('copyperms_cancel:')) {
+      return handleCopyPermsCancel(interaction);
+    }
+    if (interaction.customId.startsWith('copyperms_confirm:')) {
+      return handleCopyPermsConfirm(interaction);
+    }
   }
 
   if (interaction.isStringSelectMenu()) {
@@ -136,6 +148,12 @@ async function handleInteraction(interaction) {
     if (interaction.customId === 'mod_quarantine_logs') return handleQuarantineLogsMenu(interaction);
     if (interaction.customId === 'tag_log_menu') return handleTagLogMenu(interaction);
     if (interaction.customId === 'mod_appeal_channel') return handleAppealChannelMenu(interaction);
+    if (interaction.customId.startsWith('copyperms_src:')) {
+      return handleCopyPermsSourceMenu(interaction);
+    }
+    if (interaction.customId.startsWith('copyperms_dest:')) {
+      return handleCopyPermsDestMenu(interaction);
+    }
   }
 
   if (interaction.isRoleSelectMenu()) {

@@ -5,6 +5,7 @@ const { handleQuarantine, handleUnquarantine } = require('../commands/quarantine
 const { handleSend } = require('../commands/send');
 const { handleCrename } = require('../commands/crename');
 const { handleAfkPrefix } = require('../commands/afk');
+const { handleCopyPerms } = require('../commands/copyperms');
 const afkManager = require('./afkManager');
 const AfkStatus = require('../models/AfkStatus');
 const logger = require('../utils/logger');
@@ -47,6 +48,10 @@ async function handleMessage(message) {
 
     if (command === 'afk') {
       return handleAfkPrefix(message, parts.slice(1));
+    }
+
+    if (command === 'copyperms') {
+      return handleCopyPerms(message);
     }
   }
 
