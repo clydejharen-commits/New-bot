@@ -289,15 +289,7 @@ async function handleConfirm(interaction) {
     return interaction.update({ embeds: [buildErrorEmbed('Source and destination are the same. Nothing was changed.')], components: [] });
   }
 
-  let sourceOverwrites;
-  try {
-    sourceOverwrites = await sourceChannel.permissionOverwrites.fetch();
-  } catch (err) {
-    logger.error(`copyperms: failed to fetch source overwrites for ${sourceChannel.id}: ${err.message}`);
-    return interaction.update({ embeds: [buildErrorEmbed(`Failed to read source permission overwrites: ${err.message}`)], components: [] });
-  }
-
-  const overwriteEntries = [...sourceOverwrites.values()];
+  const overwriteEntries = [...sourceChannel.permissionOverwrites.cache.values()];
 
   for (const ow of overwriteEntries) {
     if (ow.type === 0) {
