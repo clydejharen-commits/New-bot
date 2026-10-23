@@ -32,6 +32,12 @@ const {
   handleCopyPermsConfirm,
   handleCopyPermsCancel,
 } = require('../commands/copyperms');
+const {
+  handleEmbedCommand,
+  handleEmbedButton,
+  handleEmbedSelectMenu,
+  handleEmbedModalSubmit,
+} = require('../commands/embed');
 const logger = require('../utils/logger');
 
 function wrapInteractionCtx(interaction) {
@@ -111,6 +117,8 @@ async function handleInteraction(interaction) {
     if (commandName === 'tag') return handleTag(interaction);
 
     if (commandName === 'afk') return handleAfkSlash(interaction);
+
+    if (commandName === 'embed') return handleEmbedCommand(interaction);
   }
 
   if (interaction.isButton()) {
@@ -138,10 +146,18 @@ async function handleInteraction(interaction) {
     if (interaction.customId.startsWith('copyperms_confirm:')) {
       return handleCopyPermsConfirm(interaction);
     }
+
+    if (interaction.customId.startsWith('embed_')) {
+      return handleEmbedButton(interaction);
+    }
   }
 
   if (interaction.isStringSelectMenu()) {
     if (interaction.customId === 'tracker_ping_menu') return handlePingMenu(interaction);
+
+    if (interaction.customId.startsWith('embed_')) {
+      return handleEmbedSelectMenu(interaction);
+    }
   }
 
   if (interaction.isChannelSelectMenu()) {
@@ -165,6 +181,7 @@ async function handleInteraction(interaction) {
   if (interaction.isMentionableSelectMenu()) {
     if (interaction.customId === 'tracker_ping_menu') return handlePingMenu(interaction);
   }
+
   if (interaction.isModalSubmit()) {
     if (interaction.customId.startsWith('appeal_modal:')) {
       const quarantineId = interaction.customId.split(':')[1];
@@ -173,6 +190,10 @@ async function handleInteraction(interaction) {
     if (interaction.customId.startsWith('appeal_deny_modal:')) {
       const quarantineId = interaction.customId.split(':')[1];
       return handleAppealDenyModalSubmit(interaction, quarantineId);
+    }
+
+    if (interaction.customId.startsWith('embed_modal_')) {
+      return handleEmbedModalSubmit(interaction);
     }
   }
 }
